@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Elliot" },
+      { name: "description", content: "Elliot's Crimson AI is a creative chatbot powered by Meta's Llama model via Groq." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Elliot" },
+      { property: "og:description", content: "Elliot's Crimson AI is a creative chatbot powered by Meta's Llama model via Groq." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Elliot" },
+      { name: "twitter:description", content: "Elliot's Crimson AI is a creative chatbot powered by Meta's Llama model via Groq." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/TqGvtlvxpUQ70yoDRNb6uMhQ2un1/social-images/social-1780120697032-1000039753.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/TqGvtlvxpUQ70yoDRNb6uMhQ2un1/social-images/social-1780120697032-1000039753.webp" },
     ],
     links: [
       {

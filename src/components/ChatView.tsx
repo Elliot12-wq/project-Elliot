@@ -1,0 +1,383 @@
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { ElliotThinking } from "@/components/ElliotThinking";
+import { CodeBlock } from "@/components/CodeBlock";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useShell } from "@/components/ChatShell";
+import logo from "@/assets/elliot-logo.png";
+
+type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
+
+const SUGGESTIONS = [
+  "What can you help me with?",
+  "Write a short poem about embers.",
+  "Brainstorm a startup name with me.",
+];
+
+export function ChatView({ conversationId }: { conversationId: string }) {
+  const shell = useShell();
+  const onToggleSidebar = shell?.openSidebar;
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const interimRef = useRef("");
+
+  // Load history
+  useEffect(() => {
+    let alive = true;
+    setMessages([]);
+    setStreamingText("");
+    supabase
+      .from("messages")
+      .select("id,role,content,created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (alive && data) setMessages(data as Msg[]);
+      });
+    return () => {
+      alive = false;
+      abortRef.current?.abort();
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, streamingText, streaming]);
+
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  }, [input]);
+
+  // Voice input
+  const speech = useSpeechRecognition((text, isFinal) => {
+    if (isFinal) {
+      setInput((prev) => (prev ? prev + " " : "") + text.trim());
+      interimRef.current = "";
+    } else {
+      interimRef.current = text;
+    }
+  });
+
+  async function send(text: string) {
+    const content = text.trim();
+    if (!content || streaming) return;
+    const tempUserId = `tmp-u-${Date.now()}`;
+    setMessages((prev) => [...prev, { id: tempUserId, role: "user", content }]);
+    setInput("");
+    setStreaming(true);
+    setStreamingText("");
+
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) throw new Error("Not signed in");
+
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ conversationId, userMessage: content }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setStreamingText(acc);
+      }
+
+      // Replace temp + streamed text with persisted messages
+      const { data } = await supabase
+        .from("messages")
+        .select("id,role,content,created_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+      if (data) setMessages(data as Msg[]);
+      setStreamingText("");
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        console.error(err);
+        toast.error("Couldn't reach Elliot.");
+      }
+      // Drop the optimistic user message on hard failure
+      setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }
+
+  async function regenerate() {
+    // Find last user message, delete subsequent assistant message(s), resend
+    const lastUserIdx = [...messages].reverse().findIndex((m) => m.role === "user");
+    if (lastUserIdx === -1 || streaming) return;
+    const realIdx = messages.length - 1 - lastUserIdx;
+    const lastUser = messages[realIdx];
+    // delete all messages after the last user message
+    const toDelete = messages.slice(realIdx + 1).map((m) => m.id).filter((id) => !id.startsWith("tmp"));
+    if (toDelete.length) {
+      await supabase.from("messages").delete().in("id", toDelete);
+    }
+    // Also delete the last user message — send() will re-insert it server-side
+    if (!lastUser.id.startsWith("tmp")) {
+      await supabase.from("messages").delete().eq("id", lastUser.id);
+    }
+    setMessages((prev) => prev.slice(0, realIdx));
+    send(lastUser.content);
+  }
+
+  function stopStream() {
+    abortRef.current?.abort();
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    send(input);
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send(input);
+    }
+  }
+
+  const empty = messages.length === 0 && !streaming;
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-1 flex-col">
+      {/* Top bar */}
+      <header className="flex items-center gap-3 border-b border-border/60 bg-background/40 px-4 py-3 backdrop-blur-xl">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
+            aria-label="Open chats"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+        )}
+        <div className="relative h-9 w-9">
+          <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
+          <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
+        </div>
+        <div className="flex flex-col leading-tight">
+          <h1 className="font-display text-xl tracking-tight">Elliot</h1>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Woven from llama · forged in red
+          </span>
+        </div>
+      </header>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+        {empty ? (
+          <EmptyState onPick={send} />
+        ) : (
+          <div className="mx-auto flex max-w-2xl flex-col gap-4">
+            <AnimatePresence initial={false}>
+              {messages.map((m) => (
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                  className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
+                >
+                  <Bubble role={m.role} content={m.content} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {streaming && streamingText && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex justify-start"
+              >
+                <Bubble role="assistant" content={streamingText} streaming />
+              </motion.div>
+            )}
+
+            {streaming && !streamingText && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                <div className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-md">
+                  <ElliotThinking />
+                </div>
+              </motion.div>
+            )}
+
+            {!streaming && messages.length > 0 && messages[messages.length - 1].role === "assistant" && (
+              <div className="flex justify-start">
+                <button
+                  onClick={regenerate}
+                  className="ml-1 flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:bg-card/60 hover:text-foreground"
+                >
+                  <RotateCw className="h-3 w-3" /> Regenerate
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Composer */}
+      <form
+        onSubmit={onSubmit}
+        className="relative border-t border-border/60 bg-background/50 px-4 py-4 backdrop-blur-xl"
+      >
+        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30">
+          <textarea
+            ref={textareaRef}
+            value={input + (speech.listening && interimRef.current ? ` ${interimRef.current}` : "")}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={speech.listening ? "Listening…" : "Speak to Elliot…"}
+            rows={1}
+            disabled={streaming}
+            className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+          />
+
+          {speech.supported && (
+            <button
+              type="button"
+              onClick={speech.listening ? speech.stop : speech.start}
+              disabled={streaming}
+              className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
+                speech.listening
+                  ? "border-primary/60 bg-primary/15 text-primary-glow"
+                  : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label={speech.listening ? "Stop voice input" : "Voice input"}
+            >
+              {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {speech.listening && (
+                <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
+              )}
+            </button>
+          )}
+
+          <button
+            type={streaming ? "button" : "submit"}
+            onClick={streaming ? stopStream : undefined}
+            disabled={!streaming && !input.trim()}
+            className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-ember)] transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
+            style={{ background: "var(--gradient-ember)" }}
+            aria-label={streaming ? "Stop" : "Send"}
+          >
+            {streaming ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />}
+          </button>
+        </div>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[10px] text-muted-foreground/70">
+          Elliot quietly remembers things that matter · Enter sends · Shift+Enter for newline
+        </p>
+      </form>
+    </div>
+  );
+}
+
+function Bubble({ role, content, streaming }: { role: "user" | "assistant"; content: string; streaming?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  if (role === "user") {
+    return (
+      <div
+        className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
+        style={{ background: "var(--gradient-ember)" }}
+      >
+        {content}
+      </div>
+    );
+  }
+  return (
+    <div className="group relative max-w-[90%] rounded-2xl rounded-bl-md border border-primary/20 bg-card/70 px-4 py-3 text-card-foreground backdrop-blur-md transition hover:border-primary/40 hover:shadow-[var(--shadow-ember)]">
+      <div className="prose-elliot">
+        <ReactMarkdown
+          components={{
+            code({ inline, className, children, ...props }: any) {
+              const match = /language-(\w+)/.exec(className || "");
+              const value = String(children).replace(/\n$/, "");
+              if (!inline && (match || value.includes("\n"))) {
+                return <CodeBlock language={match?.[1] || ""} value={value} />;
+              }
+              return (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            },
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+        {streaming && <span className="ml-0.5 inline-block h-3 w-1.5 -mb-0.5 animate-pulse rounded-sm bg-primary-glow" />}
+      </div>
+      {!streaming && (
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(content);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1400);
+          }}
+          className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-primary-glow"
+          aria-label="Copy"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+  return (
+    <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
+      <div className="relative mb-6 h-32 w-32">
+        <div
+          className="absolute inset-[-24px] rounded-full blur-3xl"
+          style={{ background: "var(--gradient-glow)", animation: "elliot-halo 3s ease-in-out infinite" }}
+        />
+        <img
+          src={logo}
+          alt="Elliot"
+          className="relative h-32 w-32 rounded-full object-cover ring-1 ring-primary/50"
+          style={{ animation: "elliot-breathe 3.6s ease-in-out infinite" }}
+        />
+      </div>
+      <h2 className="font-display text-4xl tracking-tight">Hello, I'm Elliot.</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Ask me anything. I think in embers and quietly remember what matters.
+      </p>
+      <div className="mt-7 flex w-full flex-col gap-2">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => onPick(s)}
+            className="group rounded-xl border border-border bg-card/40 px-4 py-3 text-left text-sm text-foreground/90 backdrop-blur-md transition hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)]"
+          >
+            <span className="mr-2 text-primary">›</span>
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

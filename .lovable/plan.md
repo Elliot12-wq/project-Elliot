@@ -1,62 +1,88 @@
-# Elliot — Groq Llama Chat App
+# Elliot v2 — Memory, History & 100x Polish
 
-A sleek red & black chat interface for "Elliot", powered by Meta's Llama via Groq. Logo is your Celtic-knot "E" mark.
+## 1. Lovable Cloud + Auth
 
-## Security first — please rotate your Groq key
-You pasted your Groq API key in chat. Chat messages aren't a safe place for secrets, so that key should be considered exposed.
+Enable Lovable Cloud. Add Email/Password + Google sign-in on `/login`. Gate the app behind `_authenticated` layout; unauthenticated users land on a marketing-lite login screen with the breathing logo.
 
-**Action for you:** Revoke it at https://console.groq.com/keys and generate a new one.
+## 2. Database schema
 
-**What I'll do:** Store the new key as a server-side secret named `GROQ_API_KEY` using Lovable's secret manager. It will only be readable inside server functions (`process.env.GROQ_API_KEY`) — never bundled into the browser, never visible in network requests, never in git. All Groq calls go through a TanStack Start server function.
+```text
+conversations
+  id uuid pk, user_id uuid (auth.users), title text, created_at, updated_at
+messages
+  id uuid pk, conversation_id uuid fk, role text, content text, created_at
+memories
+  id uuid pk, user_id uuid, key text, value text, source_message_id uuid, created_at
+  unique(user_id, key)
+```
 
-## What I'll build
+RLS: each table scoped to `auth.uid() = user_id` (messages joined via conversation). Standard GRANTs for `authenticated` + `service_role`.
 
-### 1. Logo
-Copy your upload to `src/assets/elliot-logo.png` and import it as an ES module.
+## 3. Invisible memory engine
 
-### 2. Backend — secure Groq proxy
-`src/lib/chat.functions.ts` — a `createServerFn` (POST) that:
-- Reads `GROQ_API_KEY` from `process.env` inside the handler
-- Calls `https://api.groq.com/openai/v1/chat/completions` with model `llama-3.3-70b-versatile` (latest production Llama on Groq)
-- Prepends a system prompt establishing identity: "You are Elliot, a thoughtful and creative AI assistant…"
-- Validates input with Zod (messages array, max length caps)
-- Returns assistant message; surfaces 401/429/quota errors as typed responses
+After every assistant reply, a server fn runs a lightweight extraction pass (Llama on Groq, JSON mode) over the last user message + reply with a prompt like *"Extract durable facts about the user worth remembering. Return [] if none."* New facts upsert into `memories` by `key`. No UI, no toasts — fully silent.
 
-### 3. Frontend — `src/routes/index.tsx`
-Full-screen chat UI, mobile-first (you're on 424px):
-- **Header**: Elliot logo with a slow-rotating red glow halo behind it, "Elliot" wordmark, subtle tagline
-- **Message list**: glassy bubbles — user messages in deep crimson, Elliot's in dark slate with a thin red border; markdown rendered via `react-markdown`
-- **Composer**: auto-grow textarea, send on Enter, red gradient send button with hover glow
-- **Empty state**: centered logo with breathing glow + 3 suggestion chips
-- Smooth fade-in/slide-up on every new message (framer-motion)
+On every chat call, all of the user's memories are injected into Elliot's system prompt as a "What you remember about this user" block, so Elliot references them naturally.
 
-### 4. "Elliot is thinking" animation (the showpiece)
-While waiting for a response, render a custom loader inspired by the Celtic-knot logo:
-- The logo sits center, with **three concentric rings** of red light rotating around it at different speeds and easings
-- A soft crimson **breathing halo** pulses behind the logo in sync with the rings
-- Tiny **ember particles** drift upward from beneath the logo and fade out
-- "Elliot is thinking…" text below with a **red-gradient shimmer sweep** moving left-to-right on loop
-- Built with Tailwind keyframes + framer-motion; all GPU-friendly transforms
+## 4. Streaming responses
 
-### 5. Design tokens — `src/styles.css`
-Replace the default palette with:
-- `--background`: near-black with a hint of navy (matches logo backdrop)
-- `--primary`: crimson `oklch(0.55 0.22 25)` → glow variant
-- Gradient tokens: `--gradient-ember` (crimson → bright red), `--gradient-glow` (radial red haze)
-- Shadow tokens: `--shadow-ember` (red-tinted drop shadow), `--shadow-deep`
-- Sharp 14px radius, generous spacing
-- Typography: `Instrument Serif` for the Elliot wordmark (matches the Celtic/medieval feel of the logo), `Inter` for body — loaded via Google Fonts
+Rewrite the chat backend as a TanStack server route at `src/routes/api/chat.ts` that proxies Groq's SSE stream and re-emits tokens. Client uses `fetch` + `ReadableStream` to append tokens to the in-progress assistant bubble. Thinking animation shows until the first token arrives, then morphs into a subtle pulsing caret while streaming.
 
-### 6. Page metadata
-Title "Elliot — AI Assistant", description, og:title/og:description/og:image using the logo, favicon set to the logo.
+## 5. Voice input
 
-## Tech details
-- New deps: `react-markdown`, `framer-motion`, `zod` (likely already present)
-- Conversation history kept in component state (in-memory). Refresh = new chat.
-- Errors (rate limit, quota, network) shown as red toasts via existing `sonner`
-- Streaming: Groq supports SSE but `createServerFn` returns plain DTOs — for v1 I'll use a single non-streaming response so the thinking animation is the wait experience. If you later want token-by-token streaming, that needs a server route instead and I can add it.
+Hold-to-talk mic button next to the send button using the browser `SpeechRecognition` API (webkit fallback). Live transcript fills the textarea; release to stop. Graceful "not supported" toast on unsupported browsers (Firefox/Safari desktop).
 
-## Open questions
-1. **Confirm you'll rotate the key** — say "rotated" once done and I'll prompt for the new value via the secrets form. Without this, your key stays compromised.
-2. **Persistence**: keep chats in-memory (default) or save history with Lovable Cloud so it survives refresh?
-3. **Streaming now or later**: ok to start non-streaming, or want SSE token-by-token from day one?
+## 6. Message features
+
+- **Markdown + syntax-highlighted code blocks** via `react-markdown` + `react-syntax-highlighter` (oneDark theme tinted red).
+- **Copy button** on every code block and on assistant messages.
+- **Regenerate** last assistant response.
+- **Edit & resend** any user message (truncates conversation forward).
+- **Timestamps** on hover (relative: "2m ago").
+- **Auto-generated conversation titles** — first reply triggers a title-summarization server fn.
+
+## 7. Conversation sidebar
+
+Collapsible left sidebar (shadcn `Sidebar`, mobile = sheet) listing conversations newest-first, with search, rename, delete, and a prominent "New chat" button. Active conversation highlighted in crimson. Mobile: hamburger in top bar opens the sheet.
+
+## 8. Richer visuals
+
+- **Ambient background**: slow-drifting radial crimson gradients (CSS `@property` + keyframe), plus a faint animated noise overlay for grain.
+- **Logo treatment**: empty state gets a 3D-feeling logo with parallax tilt on mouse move (framer-motion `useMotionValue`), surrounded by upgraded ember field (24 particles, varied sizes, blur layers).
+- **Thinking animation upgrade**: add a 4th orbital ring with a glowing satellite dot, a soft chromatic-aberration sheen on the logo, and a typed-out rotating status line ("Consulting memory…" → "Composing reply…" → "Polishing…").
+- **Bubble polish**: assistant bubbles get a faint inner crimson glow on hover; user bubbles get a subtle ember gradient. Message-in animation uses a spring with slight scale + blur-out.
+- **Send button**: morphs into a stop button while streaming, with a circular progress ring.
+- **Sound (optional, toggleable)**: tiny send "tick" and receive "chime" using WebAudio — off by default.
+
+## 9. Technical details
+
+- **Deps to add**: `react-syntax-highlighter`, `@types/react-syntax-highlighter`, `date-fns`.
+- **Existing**: `framer-motion`, `react-markdown`, `zod` already installed.
+- **Groq key**: stays in `GROQ_API_KEY` secret; only read inside server fns / server route handler.
+- **Streaming route** lives at `/api/chat` (not `/api/public/*` — it's auth-gated via `requireSupabaseAuth` equivalent: validates bearer from request header).
+- **Memory extraction** runs in a non-awaited background promise after the stream completes so it never blocks the user.
+
+## 10. Files
+
+```text
+src/routes/
+  __root.tsx                     (add Toaster, auth listener)
+  _authenticated.tsx             (gate)
+  _authenticated/index.tsx       (chat shell)
+  _authenticated/c.$id.tsx       (specific conversation)
+  login.tsx                      (email/password + Google)
+  api/chat.ts                    (streaming server route)
+src/components/
+  ChatShell.tsx, MessageList.tsx, Bubble.tsx, Composer.tsx,
+  MicButton.tsx, CodeBlock.tsx, ConversationSidebar.tsx,
+  ElliotThinking.tsx (upgraded), AmbientBackground.tsx, LogoMark.tsx
+src/lib/
+  conversations.functions.ts, messages.functions.ts,
+  memory.functions.ts, titles.functions.ts
+src/hooks/
+  useStreamingChat.ts, useSpeechRecognition.ts
+```
+
+## Open question
+
+Anything to **explicitly exclude** from memory (e.g. health, finance, location)? Default is no topic filter — Elliot remembers anything durable the user shares.

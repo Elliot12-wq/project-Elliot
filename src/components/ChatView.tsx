@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useShell } from "@/components/ChatShell";
 import logo from "@/assets/elliot-logo.png";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
@@ -17,13 +18,9 @@ const SUGGESTIONS = [
   "Brainstorm a startup name with me.",
 ];
 
-export function ChatView({
-  conversationId,
-  onToggleSidebar,
-}: {
-  conversationId: string;
-  onToggleSidebar?: () => void;
-}) {
+export function ChatView({ conversationId }: { conversationId: string }) {
+  const shell = useShell();
+  const onToggleSidebar = shell?.openSidebar;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);

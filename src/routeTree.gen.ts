@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as Char91indexChar93RouteImport } from './routes/[index]'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CIdRouteImport } from './routes/c.$id'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const Char91indexChar93Route = Char91indexChar93RouteImport.update({
+  id: '/index',
+  path: '/index',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -37,12 +43,14 @@ const ApiChatRoute = ApiChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/index': typeof Char91indexChar93Route
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/index': typeof Char91indexChar93Route
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/index': typeof Char91indexChar93Route
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/chat' | '/c/$id'
+  fullPaths: '/' | '/index' | '/login' | '/api/chat' | '/c/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/chat' | '/c/$id'
-  id: '__root__' | '/' | '/login' | '/api/chat' | '/c/$id'
+  to: '/' | '/index' | '/login' | '/api/chat' | '/c/$id'
+  id: '__root__' | '/' | '/index' | '/login' | '/api/chat' | '/c/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  Char91indexChar93Route: typeof Char91indexChar93Route
   LoginRoute: typeof LoginRoute
   ApiChatRoute: typeof ApiChatRoute
   CIdRoute: typeof CIdRoute
@@ -71,6 +81,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/index': {
+      id: '/index'
+      path: '/index'
+      fullPath: '/index'
+      preLoaderRoute: typeof Char91indexChar93RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  Char91indexChar93Route: Char91indexChar93Route,
   LoginRoute: LoginRoute,
   ApiChatRoute: ApiChatRoute,
   CIdRoute: CIdRoute,

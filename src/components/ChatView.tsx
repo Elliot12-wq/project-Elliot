@@ -51,7 +51,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const m = payload.new as Msg;
-          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          setMessages((prev) => {
+            if (prev.some((x) => x.id === m.id)) return prev;
+            const tempUserIndex = prev.findIndex(
+              (x) => x.id.startsWith("tmp-u-") && m.role === "user" && x.content === m.content,
+            );
+            if (tempUserIndex >= 0) {
+              return prev.map((x, i) => (i === tempUserIndex ? m : x));
+            }
+            return [...prev, m];
+          });
         },
       )
       .subscribe();
@@ -94,6 +103,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     setStreamingText("");
 
     try {
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError || !u.user) throw new Error("Session expired. Sign in again.");
       const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
       if (!token) throw new Error("Not signed in");
@@ -205,7 +216,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <div className="flex flex-col leading-tight">
           <h1 className="font-display text-xl tracking-tight">Elliot</h1>
           <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Woven from llama · forged in red
+            Woven from memory · forged in red
           </span>
         </div>
       </header>

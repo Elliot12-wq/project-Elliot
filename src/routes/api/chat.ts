@@ -205,13 +205,13 @@ You simply identify as Elliot.${memoryBlock}`;
   },
 });
 
-async function generateTitle(groqKey: string, userMsg: string, reply: string): Promise<string | null> {
+async function generateTitle(aiKey: string, userMsg: string, reply: string): Promise<string | null> {
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch(AI_CHAT_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: SMALL_MODEL,
         temperature: 0.3,
         max_tokens: 24,
         messages: [
@@ -233,18 +233,18 @@ async function generateTitle(groqKey: string, userMsg: string, reply: string): P
 }
 
 async function extractMemories(
-  groqKey: string,
+  aiKey: string,
   userId: string,
   userMsg: string,
   reply: string,
   sourceMessageId: string,
 ) {
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch(AI_CHAT_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: SMALL_MODEL,
         temperature: 0.1,
         response_format: { type: "json_object" },
         max_tokens: 400,

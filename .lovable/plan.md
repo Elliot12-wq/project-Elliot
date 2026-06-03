@@ -1,88 +1,48 @@
-# Elliot v2 — Memory, History & 100x Polish
+## What's broken
 
-## 1. Lovable Cloud + Auth
+1. **"Couldn't reach Elliot"** — POSTs to `/api/chat` fail. Most likely cause: the server route hand-rolls auth with `supabase.auth.getClaims(token)` and a manually-constructed client. On this stack, the canonical pattern is `requireSupabaseAuth` middleware on a `createServerFn`, with `attachSupabaseAuth` registered in `src/start.ts` so the browser auto-attaches the bearer. The current route also returns plain `Response` errors with no detail, so the UI just shows the generic toast.
 
-Enable Lovable Cloud. Add Email/Password + Google sign-in on `/login`. Gate the app behind `_authenticated` layout; unauthenticated users land on a marketing-lite login screen with the breathing logo.
+2. **Sidebar / "chat memory" broken on hamburger tap** — `ChatShell` mounts the mobile sidebar in a `fixed` overlay only when `mobileOpen` is true, but the close handler and the conversation list `onClick` both fire `navigate()` without closing first on some paths; tapping a conversation re-mounts `ChatView`, which calls `setMessages([])` and refetches — so history briefly disappears and, if RLS or session is off, never returns. The `conversations` query also has no `eq("user_id", …)` filter; it relies entirely on RLS, which is fine, but if the session token isn't attached yet on first render it returns `[]` and the sidebar shows "No conversations yet."
 
-## 2. Database schema
+3. **Mic doesn't work** — `useSpeechRecognition` uses the Web Speech API (`webkitSpeechRecognition`). On Android Opera / Firefox / desktop Safari, this API either doesn't exist or silently no-ops, so the button does nothing. There is also no permission prompt and no user feedback on `onerror`.
 
-```text
-conversations
-  id uuid pk, user_id uuid (auth.users), title text, created_at, updated_at
-messages
-  id uuid pk, conversation_id uuid fk, role text, content text, created_at
-memories
-  id uuid pk, user_id uuid, key text, value text, source_message_id uuid, created_at
-  unique(user_id, key)
-```
+## Fix plan
 
-RLS: each table scoped to `auth.uid() = user_id` (messages joined via conversation). Standard GRANTs for `authenticated` + `service_role`.
+### 1. Rewrite `/api/chat` as a streaming server function
 
-## 3. Invisible memory engine
+- Convert `src/routes/api/chat.ts` into `src/lib/chat.functions.ts` exporting `streamChat = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator(...).handler(...)` — but since server functions don't natively stream raw bytes, keep it as a **server route** AND fix the auth path:
+  - Validate the bearer with `supabaseAdmin.auth.getUser(token)` instead of `getClaims` (more reliable, re-validates with the Auth server).
+  - On any failure, return JSON `{ error: "…" }` with a real message so the client can surface it.
+  - Add a `try/catch` around the Groq fetch and log the actual response body.
+- Verify `src/start.ts` registers `attachSupabaseAuth` in `functionMiddleware` (already required by the template; confirm it's intact).
+- Client (`ChatView.send`): use `supabase.auth.getUser()` first to ensure a valid session, then read the access token from `getSession()` for the bearer. On non-OK response, read the error JSON and show it in the toast instead of "Couldn't reach Elliot."
 
-After every assistant reply, a server fn runs a lightweight extraction pass (Llama on Groq, JSON mode) over the last user message + reply with a prompt like *"Extract durable facts about the user worth remembering. Return [] if none."* New facts upsert into `memories` by `key`. No UI, no toasts — fully silent.
+### 2. Sidebar + history reliability
 
-On every chat call, all of the user's memories are injected into Elliot's system prompt as a "What you remember about this user" block, so Elliot references them naturally.
+- In `ConversationSidebar`, wait for `supabase.auth.getUser()` to resolve before the first query, and explicitly filter `.eq("user_id", user.id)` (defense in depth — RLS still applies).
+- Close the mobile sheet **before** navigating, and use `setTimeout(navigate, 0)` so the overlay unmount doesn't swallow the route change on slow Android browsers.
+- In `ChatView`, don't `setMessages([])` synchronously on `conversationId` change — keep the old list visible until the new fetch resolves, then swap. Prevents the "memory wiped" flash users perceive as broken history.
+- Add a realtime subscription on `messages` for the active `conversationId` so newly-persisted assistant replies appear even if the streaming swap-in fails.
 
-## 4. Streaming responses
+### 3. Mic: graceful capability + permission handling
 
-Rewrite the chat backend as a TanStack server route at `src/routes/api/chat.ts` that proxies Groq's SSE stream and re-emits tokens. Client uses `fetch` + `ReadableStream` to append tokens to the in-progress assistant bubble. Thinking animation shows until the first token arrives, then morphs into a subtle pulsing caret while streaming.
+- In `useSpeechRecognition`:
+  - If `SpeechRecognition` is unsupported, expose `supported: false` (already done) AND have the button **still render** but show a toast "Voice input isn't supported in this browser" when tapped — right now it's hidden, so users think it's "broken."
+  - Surface real errors (`onerror`): toast "Microphone blocked — enable it in browser settings" on `not-allowed`, "No speech detected" on `no-speech`, etc.
+  - Before `rec.start()`, proactively call `navigator.permissions.query({ name: "microphone" })` when available and short-circuit with a clear toast if denied.
+  - Keep `rec.start()` synchronous inside the click handler (already correct — don't add awaits before it, per browser gesture rules).
 
-## 5. Voice input
+### 4. Misc polish while we're in there
 
-Hold-to-talk mic button next to the send button using the browser `SpeechRecognition` API (webkit fallback). Live transcript fills the textarea; release to stop. Graceful "not supported" toast on unsupported browsers (Firefox/Safari desktop).
+- `src/routes/index.tsx`: if `getSession()` returns null on first call but the user is actually signed in (race on slow networks), also listen to `onAuthStateChange` once before redirecting, to avoid bouncing signed-in users to `/login`.
 
-## 6. Message features
+## Files touched
 
-- **Markdown + syntax-highlighted code blocks** via `react-markdown` + `react-syntax-highlighter` (oneDark theme tinted red).
-- **Copy button** on every code block and on assistant messages.
-- **Regenerate** last assistant response.
-- **Edit & resend** any user message (truncates conversation forward).
-- **Timestamps** on hover (relative: "2m ago").
-- **Auto-generated conversation titles** — first reply triggers a title-summarization server fn.
+- `src/routes/api/chat.ts` — auth + error handling
+- `src/components/ChatView.tsx` — better error surface, soft history swap, send() auth flow, mic button always visible
+- `src/components/ConversationSidebar.tsx` — explicit user filter, close-before-navigate
+- `src/hooks/useSpeechRecognition.ts` — error callbacks, permission check
+- `src/routes/index.tsx` — auth race fix
+- `src/start.ts` — verify `attachSupabaseAuth` is registered (no-op if already correct)
 
-## 7. Conversation sidebar
-
-Collapsible left sidebar (shadcn `Sidebar`, mobile = sheet) listing conversations newest-first, with search, rename, delete, and a prominent "New chat" button. Active conversation highlighted in crimson. Mobile: hamburger in top bar opens the sheet.
-
-## 8. Richer visuals
-
-- **Ambient background**: slow-drifting radial crimson gradients (CSS `@property` + keyframe), plus a faint animated noise overlay for grain.
-- **Logo treatment**: empty state gets a 3D-feeling logo with parallax tilt on mouse move (framer-motion `useMotionValue`), surrounded by upgraded ember field (24 particles, varied sizes, blur layers).
-- **Thinking animation upgrade**: add a 4th orbital ring with a glowing satellite dot, a soft chromatic-aberration sheen on the logo, and a typed-out rotating status line ("Consulting memory…" → "Composing reply…" → "Polishing…").
-- **Bubble polish**: assistant bubbles get a faint inner crimson glow on hover; user bubbles get a subtle ember gradient. Message-in animation uses a spring with slight scale + blur-out.
-- **Send button**: morphs into a stop button while streaming, with a circular progress ring.
-- **Sound (optional, toggleable)**: tiny send "tick" and receive "chime" using WebAudio — off by default.
-
-## 9. Technical details
-
-- **Deps to add**: `react-syntax-highlighter`, `@types/react-syntax-highlighter`, `date-fns`.
-- **Existing**: `framer-motion`, `react-markdown`, `zod` already installed.
-- **Groq key**: stays in `GROQ_API_KEY` secret; only read inside server fns / server route handler.
-- **Streaming route** lives at `/api/chat` (not `/api/public/*` — it's auth-gated via `requireSupabaseAuth` equivalent: validates bearer from request header).
-- **Memory extraction** runs in a non-awaited background promise after the stream completes so it never blocks the user.
-
-## 10. Files
-
-```text
-src/routes/
-  __root.tsx                     (add Toaster, auth listener)
-  _authenticated.tsx             (gate)
-  _authenticated/index.tsx       (chat shell)
-  _authenticated/c.$id.tsx       (specific conversation)
-  login.tsx                      (email/password + Google)
-  api/chat.ts                    (streaming server route)
-src/components/
-  ChatShell.tsx, MessageList.tsx, Bubble.tsx, Composer.tsx,
-  MicButton.tsx, CodeBlock.tsx, ConversationSidebar.tsx,
-  ElliotThinking.tsx (upgraded), AmbientBackground.tsx, LogoMark.tsx
-src/lib/
-  conversations.functions.ts, messages.functions.ts,
-  memory.functions.ts, titles.functions.ts
-src/hooks/
-  useStreamingChat.ts, useSpeechRecognition.ts
-```
-
-## Open question
-
-Anything to **explicitly exclude** from memory (e.g. health, finance, location)? Default is no topic filter — Elliot remembers anything durable the user shares.
+No DB migrations, no new dependencies.

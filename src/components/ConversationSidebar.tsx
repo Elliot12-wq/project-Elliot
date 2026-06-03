@@ -103,10 +103,17 @@ export function ConversationSidebar({
           </div>
         ) : (
           filtered.map((c) => (
-            <button
+            <div
               key={c.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => {
+                onClose?.();
+                window.setTimeout(() => navigate({ to: "/c/$id", params: { id: c.id } }), 0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
                 onClose?.();
                 window.setTimeout(() => navigate({ to: "/c/$id", params: { id: c.id } }), 0);
               }}
@@ -128,7 +135,7 @@ export function ConversationSidebar({
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            </button>
+            </div>
           ))
         )}
       </nav>

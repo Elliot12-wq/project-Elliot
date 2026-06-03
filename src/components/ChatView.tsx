@@ -30,10 +30,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const interimRef = useRef("");
 
-  // Load history
+  // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
     let alive = true;
-    setMessages([]);
     setStreamingText("");
     supabase
       .from("messages")
@@ -41,11 +40,26 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
-        if (alive && data) setMessages(data as Msg[]);
+        if (alive) setMessages((data as Msg[]) ?? []);
       });
+
+    // Realtime: catch newly-persisted assistant replies even if streaming swap-in fails
+    const channel = supabase
+      .channel(`msgs-${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
+        (payload) => {
+          const m = payload.new as Msg;
+          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+        },
+      )
+      .subscribe();
+
     return () => {
       alive = false;
       abortRef.current?.abort();
+      supabase.removeChannel(channel);
     };
   }, [conversationId]);
 
@@ -93,7 +107,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         body: JSON.stringify({ conversationId, userMessage: content }),
         signal: ctrl.signal,
       });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok || !res.body) {
+        let msg = `Couldn't reach Elliot (HTTP ${res.status}).`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {
+          /* not json */
+        }
+        throw new Error(msg);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -105,7 +128,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         setStreamingText(acc);
       }
 
-      // Replace temp + streamed text with persisted messages
+      // Refresh from DB — realtime may have already added rows
       const { data } = await supabase
         .from("messages")
         .select("id,role,content,created_at")
@@ -116,9 +139,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     } catch (err: any) {
       if (err?.name !== "AbortError") {
         console.error(err);
-        toast.error("Couldn't reach Elliot.");
+        toast.error(err?.message || "Couldn't reach Elliot.");
       }
-      // Drop the optimistic user message on hard failure
       setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
     } finally {
       setStreaming(false);
@@ -257,24 +279,22 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
           />
 
-          {speech.supported && (
-            <button
-              type="button"
-              onClick={speech.listening ? speech.stop : speech.start}
-              disabled={streaming}
-              className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
-                speech.listening
-                  ? "border-primary/60 bg-primary/15 text-primary-glow"
-                  : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
-              }`}
-              aria-label={speech.listening ? "Stop voice input" : "Voice input"}
-            >
-              {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              {speech.listening && (
-                <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
-              )}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={speech.listening ? speech.stop : speech.start}
+            disabled={streaming}
+            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
+              speech.listening
+                ? "border-primary/60 bg-primary/15 text-primary-glow"
+                : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
+            }`}
+            aria-label={speech.listening ? "Stop voice input" : "Voice input"}
+          >
+            {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {speech.listening && (
+              <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
+            )}
+          </button>
 
           <button
             type={streaming ? "button" : "submit"}

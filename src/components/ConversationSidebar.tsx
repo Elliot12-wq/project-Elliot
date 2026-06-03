@@ -21,9 +21,12 @@ export function ConversationSidebar({
   useEffect(() => {
     let alive = true;
     const load = async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
       const { data } = await supabase
         .from("conversations")
         .select("id,title,updated_at")
+        .eq("user_id", u.user.id)
         .order("updated_at", { ascending: false })
         .limit(100);
       if (alive && data) setList(data as Conv[]);

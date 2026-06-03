@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Trash2, LogOut, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -53,7 +53,7 @@ export function ConversationSidebar({
       .single();
     if (error || !data) return toast.error("Couldn't start chat");
     onClose?.();
-    navigate({ to: "/c/$id", params: { id: data.id } });
+    window.setTimeout(() => navigate({ to: "/c/$id", params: { id: data.id } }), 0);
   }
 
   async function remove(id: string) {
@@ -103,12 +103,14 @@ export function ConversationSidebar({
           </div>
         ) : (
           filtered.map((c) => (
-            <Link
+            <button
               key={c.id}
-              to="/c/$id"
-              params={{ id: c.id }}
-              onClick={onClose}
-              className={`group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+              type="button"
+              onClick={() => {
+                onClose?.();
+                window.setTimeout(() => navigate({ to: "/c/$id", params: { id: c.id } }), 0);
+              }}
+              className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
                 c.id === activeId
                   ? "bg-primary/15 text-foreground"
                   : "text-foreground/80 hover:bg-card/60"
@@ -118,7 +120,6 @@ export function ConversationSidebar({
               <span className="flex-1 truncate">{c.title}</span>
               <button
                 onClick={(e) => {
-                  e.preventDefault();
                   e.stopPropagation();
                   remove(c.id);
                 }}
@@ -127,7 +128,7 @@ export function ConversationSidebar({
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            </Link>
+            </button>
           ))
         )}
       </nav>

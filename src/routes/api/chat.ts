@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const AI_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const CHAT_MODEL = "google/gemini-3-flash-preview";
+const SMALL_MODEL = "google/gemini-3.1-flash-lite-preview";
+
 const jsonError = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {
     status,
@@ -60,13 +64,12 @@ export const Route = createFileRoute("/api/chat")({
           return jsonError(500, "Couldn't save your message.");
         }
 
-        // Build history (last 30)
+        // Build complete history for this conversation.
         const { data: history } = await supabaseAdmin
           .from("messages")
           .select("role, content")
           .eq("conversation_id", conversationId)
-          .order("created_at", { ascending: true })
-          .limit(30);
+          .order("created_at", { ascending: true });
 
         // Memories
         const { data: memRows } = await supabaseAdmin
@@ -84,24 +87,24 @@ export const Route = createFileRoute("/api/chat")({
 
         const SYSTEM = `You are Elliot, a thoughtful, creative, warmly confident AI assistant.
 Calm, intelligent, a little poetic — never robotic. Use markdown when it helps (lists, code, emphasis).
-You were built on Meta's Llama via Groq, but you simply identify as Elliot.${memoryBlock}`;
+You simply identify as Elliot.${memoryBlock}`;
 
-        const groqKey = process.env.GROQ_API_KEY;
-        if (!groqKey) {
-          console.error("GROQ_API_KEY missing");
-          return jsonError(500, "Server is missing the Groq API key.");
+        const aiKey = process.env.LOVABLE_API_KEY;
+        if (!aiKey) {
+          console.error("LOVABLE_API_KEY missing");
+          return jsonError(500, "AI is not configured yet.");
         }
 
-        let groqRes: Response;
+        let aiRes: Response;
         try {
-          groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          aiRes = await fetch(AI_CHAT_URL, {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${groqKey}`,
+              Authorization: `Bearer ${aiKey}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
+              model: CHAT_MODEL,
               temperature: 0.7,
               stream: true,
               messages: [
@@ -111,14 +114,16 @@ You were built on Meta's Llama via Groq, but you simply identify as Elliot.${mem
             }),
           });
         } catch (e) {
-          console.error("groq fetch threw", e);
-          return jsonError(502, "Couldn't reach the language model.");
+          console.error("AI gateway fetch threw", e);
+          return jsonError(502, "Couldn't reach Elliot right now.");
         }
 
-        if (!groqRes.ok || !groqRes.body) {
-          const text = await groqRes.text().catch(() => "");
-          console.error("Groq error", groqRes.status, text);
-          return jsonError(502, `Language model error (${groqRes.status}).`);
+        if (!aiRes.ok || !aiRes.body) {
+          const text = await aiRes.text().catch(() => "");
+          console.error("AI gateway error", aiRes.status, text);
+          if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again in a moment.");
+          if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted. Add credits in Workspace usage to continue.");
+          return jsonError(502, "Elliot couldn't start a response. Please try again.");
         }
 
         const encoder = new TextEncoder();
@@ -127,7 +132,7 @@ You were built on Meta's Llama via Groq, but you simply identify as Elliot.${mem
 
         const stream = new ReadableStream({
           async start(controller) {
-            const reader = groqRes.body!.getReader();
+            const reader = aiRes.body!.getReader();
             let buffer = "";
             try {
               while (true) {
@@ -170,7 +175,7 @@ You were built on Meta's Llama via Groq, but you simply identify as Elliot.${mem
                   }
 
                   if (conv.title === "New chat" && fullText.trim()) {
-                    const title = await generateTitle(groqKey, userMessage, fullText);
+                    const title = await generateTitle(aiKey, userMessage, fullText);
                     if (title) {
                       await supabaseAdmin
                         .from("conversations")
@@ -179,7 +184,7 @@ You were built on Meta's Llama via Groq, but you simply identify as Elliot.${mem
                     }
                   }
 
-                  await extractMemories(groqKey, userId, userMessage, fullText, userMsgRow.id);
+                  await extractMemories(aiKey, userId, userMessage, fullText, userMsgRow.id);
                 } catch (e) {
                   console.error("post-stream work failed", e);
                 }

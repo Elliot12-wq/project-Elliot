@@ -8,7 +8,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Elliot — AI that remembers" },
-      { name: "description", content: "Elliot is a thoughtful AI companion that quietly remembers what matters. Powered by Llama via Groq." },
+      { name: "description", content: "Elliot is a thoughtful AI companion that quietly remembers what matters." },
     ],
     links: [{ rel: "icon", href: logo }],
   }),

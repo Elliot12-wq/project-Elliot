@@ -216,7 +216,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <div className="flex flex-col leading-tight">
           <h1 className="font-display text-xl tracking-tight">Elliot</h1>
           <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Woven from llama · forged in red
+            Woven from memory · forged in red
           </span>
         </div>
       </header>

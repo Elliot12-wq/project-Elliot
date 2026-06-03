@@ -19,16 +19,14 @@ export const Route = createFileRoute("/")({
 function IndexRedirect() {
   const navigate = useNavigate();
   useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) {
-        navigate({ to: "/login", replace: true });
-        return;
-      }
-      // pick latest or create
+    let done = false;
+    const go = async (userId: string) => {
+      if (done) return;
+      done = true;
       const { data: latest } = await supabase
         .from("conversations")
         .select("id")
+        .eq("user_id", userId)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -38,11 +36,33 @@ function IndexRedirect() {
       }
       const { data: created } = await supabase
         .from("conversations")
-        .insert({ user_id: s.session.user.id, title: "New chat" })
+        .insert({ user_id: userId, title: "New chat" })
         .select("id")
         .single();
       if (created?.id) {
         navigate({ to: "/c/$id", params: { id: created.id }, replace: true });
+      }
+    };
+
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (s.session) {
+        go(s.session.user.id);
+      } else {
+        // Wait briefly for auth to hydrate; fall back to /login
+        const t = setTimeout(() => {
+          if (!done) {
+            done = true;
+            navigate({ to: "/login", replace: true });
+          }
+        }, 1200);
+        const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+          if (session && !done) {
+            clearTimeout(t);
+            go(session.user.id);
+            sub.subscription.unsubscribe();
+          }
+        });
       }
     })();
   }, [navigate]);

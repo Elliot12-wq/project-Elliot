@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Search, Trash2, LogOut, MessageSquare } from "lucide-react";
+import { Plus, Search, Trash2, LogOut, MessageSquare, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logo from "@/assets/elliot-logo.png";
@@ -56,10 +56,17 @@ export function ConversationSidebar({
     window.setTimeout(() => navigate({ to: "/c/$id", params: { id: data.id } }), 0);
   }
 
-  async function remove(id: string) {
-    await supabase.from("conversations").delete().eq("id", id);
+  async function remove(id: string, title: string) {
+    const ok = window.confirm(`Delete “${title || "this chat"}”? This removes the whole conversation.`);
+    if (!ok) return;
+    const { error } = await supabase.from("conversations").delete().eq("id", id);
+    if (error) return toast.error("Couldn't delete that chat.");
     setList((l) => l.filter((c) => c.id !== id));
-    if (id === activeId) navigate({ to: "/" });
+    toast.success("Chat deleted.");
+    if (id === activeId) {
+      onClose?.();
+      window.setTimeout(() => navigate({ to: "/" }), 0);
+    }
   }
 
   async function signOut() {
@@ -72,10 +79,20 @@ export function ConversationSidebar({
     : list;
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-border/60 bg-card/40 backdrop-blur-xl">
+    <aside className="flex h-full w-72 max-w-[86vw] flex-col border-r border-border/60 bg-card/90 backdrop-blur-xl md:bg-card/40">
       <div className="flex items-center gap-2 px-4 py-4">
         <img src={logo} alt="" className="h-8 w-8 rounded-full ring-1 ring-primary/40" />
-        <span className="font-display text-2xl tracking-tight">Elliot</span>
+        <span className="flex-1 font-display text-2xl tracking-tight">Elliot</span>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-background/60 hover:text-foreground md:hidden"
+            aria-label="Close chats"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <button
@@ -126,12 +143,13 @@ export function ConversationSidebar({
               <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate">{c.title}</span>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  remove(c.id);
+                  remove(c.id, c.title);
                 }}
-                className="opacity-0 transition group-hover:opacity-100 hover:text-destructive"
-                aria-label="Delete"
+                className="rounded-md p-1 text-muted-foreground opacity-100 transition hover:bg-background/60 hover:text-destructive md:opacity-0 md:group-hover:opacity-100"
+                aria-label={`Delete ${c.title}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

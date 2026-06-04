@@ -12,6 +12,19 @@ import logo from "@/assets/elliot-logo.png";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
 
+function mergeMessages(existing: Msg[], incoming: Msg[]) {
+  const merged = [...existing];
+  for (const m of incoming) {
+    if (merged.some((x) => x.id === m.id)) continue;
+    const tempIndex = merged.findIndex(
+      (x) => x.id.startsWith("tmp-") && x.role === m.role && x.content.trim() === m.content.trim(),
+    );
+    if (tempIndex >= 0) merged[tempIndex] = m;
+    else merged.push(m);
+  }
+  return merged.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+}
+
 const SUGGESTIONS = [
   "What can you help me with?",
   "Write a short poem about embers.",
@@ -53,13 +66,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           const m = payload.new as Msg;
           setMessages((prev) => {
             if (prev.some((x) => x.id === m.id)) return prev;
-            const tempUserIndex = prev.findIndex(
-              (x) => x.id.startsWith("tmp-u-") && m.role === "user" && x.content === m.content,
-            );
-            if (tempUserIndex >= 0) {
-              return prev.map((x, i) => (i === tempUserIndex ? m : x));
-            }
-            return [...prev, m];
+            return mergeMessages(prev, [m]);
           });
         },
       )
@@ -139,13 +146,17 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         setStreamingText(acc);
       }
 
+      if (acc.trim()) {
+        setMessages((prev) => mergeMessages(prev, [{ id: `tmp-a-${Date.now()}`, role: "assistant", content: acc }]));
+      }
+
       // Refresh from DB — realtime may have already added rows
       const { data } = await supabase
         .from("messages")
         .select("id,role,content,created_at")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
-      if (data) setMessages(data as Msg[]);
+      if (data) setMessages((prev) => mergeMessages(prev, data as Msg[]));
       setStreamingText("");
     } catch (err: any) {
       if (err?.name !== "AbortError") {
@@ -202,6 +213,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       <header className="flex items-center gap-3 border-b border-border/60 bg-background/40 px-4 py-3 backdrop-blur-xl">
         {onToggleSidebar && (
           <button
+            type="button"
             onClick={onToggleSidebar}
             className="rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
             aria-label="Open chats"

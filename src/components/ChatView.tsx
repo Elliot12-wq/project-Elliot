@@ -22,7 +22,10 @@ function mergeMessages(existing: Msg[], incoming: Msg[]) {
     if (tempIndex >= 0) merged[tempIndex] = m;
     else merged.push(m);
   }
-  return merged.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+  return merged.sort((a, b) => {
+    if (!a.created_at || !b.created_at) return 0;
+    return a.created_at.localeCompare(b.created_at);
+  });
 }
 
 const SUGGESTIONS = [

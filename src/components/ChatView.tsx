@@ -58,13 +58,19 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       .select("id,role,content,created_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        if (alive) setMessages((data as Msg[]) ?? []);
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) {
+          console.error("[ChatView] load messages failed:", error);
+          toast.error("Couldn't load this chat's history.");
+          return;
+        }
+        setMessages((data as Msg[]) ?? []);
       });
 
     // Realtime: catch newly-persisted assistant replies even if streaming swap-in fails
     const channel = supabase
-      .channel(`msgs-${conversationId}`)
+      .channel(`msgs-${conversationId}-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },

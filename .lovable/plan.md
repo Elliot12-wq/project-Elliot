@@ -1,48 +1,49 @@
-## What's broken
+# Fix: chat route crash + mobile burger menu
 
-1. **"Couldn't reach Elliot"** — POSTs to `/api/chat` fail. Most likely cause: the server route hand-rolls auth with `supabase.auth.getClaims(token)` and a manually-constructed client. On this stack, the canonical pattern is `requireSupabaseAuth` middleware on a `createServerFn`, with `attachSupabaseAuth` registered in `src/start.ts` so the browser auto-attaches the bearer. The current route also returns plain `Response` errors with no detail, so the UI just shows the generic toast.
+## What's actually happening
 
-2. **Sidebar / "chat memory" broken on hamburger tap** — `ChatShell` mounts the mobile sidebar in a `fixed` overlay only when `mobileOpen` is true, but the close handler and the conversation list `onClick` both fire `navigate()` without closing first on some paths; tapping a conversation re-mounts `ChatView`, which calls `setMessages([])` and refetches — so history briefly disappears and, if RLS or session is off, never returns. The `conversations` query also has no `eq("user_id", …)` filter; it relies entirely on RLS, which is fine, but if the session token isn't attached yet on first render it returns `[]` and the sidebar shows "No conversations yet."
+The "This page didn't load" screen is the **root error boundary** in `src/routes/__root.tsx` firing. "Try again" calls `router.invalidate()` + `reset()`, which re-mounts the same component — so if the crash is deterministic (SSR throw, missing session, bad conversation id), retrying can never recover. That's why the button does nothing.
 
-3. **Mic doesn't work** — `useSpeechRecognition` uses the Web Speech API (`webkitSpeechRecognition`). On Android Opera / Firefox / desktop Safari, this API either doesn't exist or silently no-ops, so the button does nothing. There is also no permission prompt and no user feedback on `onerror`.
+Two independent problems feed into this:
 
-## Fix plan
+1. **`/c/$id` server-renders** even though everything inside (Supabase session, realtime, localStorage) is browser-only. On a hard refresh or when Opera opens a deep link cold, SSR can throw and bubble straight to the root error boundary.
+2. **Mobile burger** opens the sidebar, but the sidebar's realtime channel is named `conv-list` (collides across mounts) and the overlay lives inside `ChatShell`'s flex/overflow-hidden container — on some mobile browsers (Opera, in-app Facebook browser) that ancestor creates a stacking context that hides the panel, so tapping the burger looks like nothing happens.
 
-### 1. Rewrite `/api/chat` as a streaming server function
+## Changes
 
-- Convert `src/routes/api/chat.ts` into `src/lib/chat.functions.ts` exporting `streamChat = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator(...).handler(...)` — but since server functions don't natively stream raw bytes, keep it as a **server route** AND fix the auth path:
-  - Validate the bearer with `supabaseAdmin.auth.getUser(token)` instead of `getClaims` (more reliable, re-validates with the Auth server).
-  - On any failure, return JSON `{ error: "…" }` with a real message so the client can surface it.
-  - Add a `try/catch` around the Groq fetch and log the actual response body.
-- Verify `src/start.ts` registers `attachSupabaseAuth` in `functionMiddleware` (already required by the template; confirm it's intact).
-- Client (`ChatView.send`): use `supabase.auth.getUser()` first to ensure a valid session, then read the access token from `getSession()` for the bearer. On non-OK response, read the error JSON and show it in the toast instead of "Couldn't reach Elliot."
+### 1. Make the chat shell client-only — `src/routes/c.$id.tsx` and `src/routes/index.tsx`
 
-### 2. Sidebar + history reliability
+Add `ssr: false` to both routes. Both are auth-gated and render nothing meaningful on the server anyway. This kills the SSR crash path entirely.
 
-- In `ConversationSidebar`, wait for `supabase.auth.getUser()` to resolve before the first query, and explicitly filter `.eq("user_id", user.id)` (defense in depth — RLS still applies).
-- Close the mobile sheet **before** navigating, and use `setTimeout(navigate, 0)` so the overlay unmount doesn't swallow the route change on slow Android browsers.
-- In `ChatView`, don't `setMessages([])` synchronously on `conversationId` change — keep the old list visible until the new fetch resolves, then swap. Prevents the "memory wiped" flash users perceive as broken history.
-- Add a realtime subscription on `messages` for the active `conversationId` so newly-persisted assistant replies appear even if the streaming swap-in fails.
+### 2. Give `/c/$id` its own friendly errorComponent — `src/routes/c.$id.tsx`
 
-### 3. Mic: graceful capability + permission handling
+Instead of falling through to the root "This page didn't load", show a small "Couldn't open this chat" card with two buttons:
+- **Open latest chat** → navigates to `/` (which picks the most recent conversation)
+- **Try again** → `router.invalidate()` + `reset()`
 
-- In `useSpeechRecognition`:
-  - If `SpeechRecognition` is unsupported, expose `supported: false` (already done) AND have the button **still render** but show a toast "Voice input isn't supported in this browser" when tapped — right now it's hidden, so users think it's "broken."
-  - Surface real errors (`onerror`): toast "Microphone blocked — enable it in browser settings" on `not-allowed`, "No speech detected" on `no-speech`, etc.
-  - Before `rec.start()`, proactively call `navigator.permissions.query({ name: "microphone" })` when available and short-circuit with a clear toast if denied.
-  - Keep `rec.start()` synchronous inside the click handler (already correct — don't add awaits before it, per browser gesture rules).
+This way even if something does throw, the user lands somewhere usable instead of a dead-end retry loop.
 
-### 4. Misc polish while we're in there
+### 3. Delete the `/index` alias — `src/routes/[index].tsx`
 
-- `src/routes/index.tsx`: if `getSession()` returns null on first call but the user is actually signed in (race on slow networks), also listen to `onAuthStateChange` once before redirecting, to avoid bouncing signed-in users to `/login`.
+The bracketed filename is a workaround that's caused more trouble than it solved. Remove it; TanStack's default not-found will route stray `/index` hits to the root 404, and the root `Go home` button works fine. (The user's screenshot is on `/index`, suggesting this alias may itself be implicated.)
 
-## Files touched
+### 4. Harden the mobile sidebar — `src/components/ChatShell.tsx` and `src/components/ConversationSidebar.tsx`
 
-- `src/routes/api/chat.ts` — auth + error handling
-- `src/components/ChatView.tsx` — better error surface, soft history swap, send() auth flow, mic button always visible
-- `src/components/ConversationSidebar.tsx` — explicit user filter, close-before-navigate
-- `src/hooks/useSpeechRecognition.ts` — error callbacks, permission check
-- `src/routes/index.tsx` — auth race fix
-- `src/start.ts` — verify `attachSupabaseAuth` is registered (no-op if already correct)
+- Render the mobile overlay + sidebar via `createPortal(..., document.body)` so no ancestor's stacking context can hide it.
+- Lock body scroll while `mobileOpen` is true (`document.body.style.overflow = 'hidden'`).
+- In `ConversationSidebar`, give the realtime channel a unique name: `` `conv-list-${userId}-${Math.random()}` `` so repeated mounts don't collide.
 
-No DB migrations, no new dependencies.
+### 5. Defensive guard in `ChatView` — `src/components/ChatView.tsx`
+
+Wrap the initial `supabase.from("messages").select(...)` `.then` in a `.catch` that surfaces a toast instead of throwing into the boundary. The realtime channel name should also include `Date.now()` to avoid collisions across remounts.
+
+## Technical notes
+
+- `ssr: false` on a `createFileRoute` skips both server render and prerender for that route — the route still renders normally on the client.
+- The root `ErrorComponent` stays as the last-resort fallback; per-route `errorComponent` takes precedence and prevents the dead-end retry.
+- No backend/schema changes. No new dependencies.
+
+## Out of scope
+
+- The AI streaming/disappear behavior (already fixed per your last message).
+- Visual redesign of the sidebar.

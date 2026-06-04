@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
@@ -30,6 +31,18 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
     };
   }, [navigate]);
 
+  // Body scroll lock while mobile sidebar is open
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (mobileOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [mobileOpen]);
+
   if (!ready) {
     return (
       <div className="flex h-[100dvh] items-center justify-center">
@@ -50,6 +63,22 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
     );
   }
 
+  const mobileOverlay =
+    mobileOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="md:hidden">
+            <div
+              className="fixed inset-0 z-[1000] bg-background/70 backdrop-blur-sm"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 z-[1001]">
+              <ConversationSidebar activeId={activeId} onClose={() => setMobileOpen(false)} />
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <ShellCtx.Provider value={{ openSidebar: () => setMobileOpen(true) }}>
       <div className="relative flex h-[100dvh] overflow-hidden">
@@ -60,20 +89,9 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
           <ConversationSidebar activeId={activeId} />
         </div>
 
-        {mobileOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm md:hidden"
-              onClick={() => setMobileOpen(false)}
-            />
-            <div className="fixed inset-y-0 left-0 z-50 md:hidden">
-              <ConversationSidebar activeId={activeId} onClose={() => setMobileOpen(false)} />
-            </div>
-          </>
-        )}
-
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </div>
+      {mobileOverlay}
     </ShellCtx.Provider>
   );
 }

@@ -33,8 +33,9 @@ export function ConversationSidebar({
     };
     load();
 
+    const channelName = `conv-list-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel("conv-list")
+      .channel(channelName)
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, load)
       .subscribe();
     return () => {

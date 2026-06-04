@@ -5,6 +5,7 @@ import { AmbientBackground } from "@/components/AmbientBackground";
 import logo from "@/assets/elliot-logo.png";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Elliot — AI that remembers" },

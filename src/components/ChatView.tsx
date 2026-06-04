@@ -16,6 +16,9 @@ function mergeMessages(existing: Msg[], incoming: Msg[]) {
   const merged = [...existing];
   for (const m of incoming) {
     if (merged.some((x) => x.id === m.id)) continue;
+    if (m.id.startsWith("tmp-") && merged.some((x) => !x.id.startsWith("tmp-") && x.role === m.role && x.content.trim() === m.content.trim())) {
+      continue;
+    }
     const tempIndex = merged.findIndex(
       (x) => x.id.startsWith("tmp-") && x.role === m.role && x.content.trim() === m.content.trim(),
     );

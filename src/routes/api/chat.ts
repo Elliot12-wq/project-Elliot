@@ -161,34 +161,32 @@ You simply identify as Elliot.${memoryBlock}`;
             } catch (e) {
               console.error("stream error", e);
             } finally {
-              controller.close();
-
-              (async () => {
-                try {
-                  if (fullText.trim()) {
-                    await supabaseAdmin.from("messages").insert({
-                      conversation_id: conversationId,
-                      user_id: userId,
-                      role: "assistant",
-                      content: fullText,
-                    });
-                  }
-
-                  if (conv.title === "New chat" && fullText.trim()) {
-                    const title = await generateTitle(aiKey, userMessage, fullText);
-                    if (title) {
-                      await supabaseAdmin
-                        .from("conversations")
-                        .update({ title })
-                        .eq("id", conversationId);
-                    }
-                  }
-
-                  await extractMemories(aiKey, userId, userMessage, fullText, userMsgRow.id);
-                } catch (e) {
-                  console.error("post-stream work failed", e);
+              try {
+                if (fullText.trim()) {
+                  const { error: aInsErr } = await supabaseAdmin.from("messages").insert({
+                    conversation_id: conversationId,
+                    user_id: userId,
+                    role: "assistant",
+                    content: fullText,
+                  });
+                  if (aInsErr) console.error("insert assistant msg failed", aInsErr);
                 }
-              })();
+
+                if (conv.title === "New chat" && fullText.trim()) {
+                  const title = await generateTitle(aiKey, userMessage, fullText);
+                  if (title) {
+                    await supabaseAdmin
+                      .from("conversations")
+                      .update({ title })
+                      .eq("id", conversationId);
+                  }
+                }
+
+                await extractMemories(aiKey, userId, userMessage, fullText, userMsgRow.id);
+              } catch (e) {
+                console.error("post-stream work failed", e);
+              }
+              controller.close();
             }
           },
         });

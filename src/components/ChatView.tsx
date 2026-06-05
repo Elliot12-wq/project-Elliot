@@ -441,12 +441,28 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 function Bubble({ role, content, streaming }: { role: "user" | "assistant"; content: string; streaming?: boolean }) {
   const [copied, setCopied] = useState(false);
   if (role === "user") {
+    // Split out markdown image lines so they render as actual images
+    const imgRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+    const images: string[] = [];
+    const textOnly = content.replace(imgRegex, (_m, url) => {
+      images.push(url);
+      return "";
+    }).trim();
     return (
       <div
-        className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
+        className="max-w-[85%] space-y-2 rounded-2xl rounded-br-md px-3 py-2 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
         style={{ background: "var(--gradient-ember)" }}
       >
-        {content}
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {images.map((u, i) => (
+              <a key={i} href={u} target="_blank" rel="noreferrer" className="block">
+                <img src={u} alt="" className="max-h-56 max-w-[14rem] rounded-lg object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
+        {textOnly && <div className="px-1 py-0.5 whitespace-pre-wrap">{textOnly}</div>}
       </div>
     );
   }

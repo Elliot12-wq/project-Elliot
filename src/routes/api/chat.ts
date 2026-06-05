@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/chat")({
         }
         const userId = userData.user.id;
 
-        let body: { conversationId?: string; userMessage?: string };
+        let body: { conversationId?: string; userMessage?: string; imageUrls?: string[] };
         try {
           body = await request.json();
         } catch {
@@ -35,7 +35,10 @@ export const Route = createFileRoute("/api/chat")({
         }
         const conversationId = String(body.conversationId ?? "");
         const userMessage = String(body.userMessage ?? "").slice(0, 8000);
-        if (!conversationId || !userMessage.trim()) {
+        const imageUrls = Array.isArray(body.imageUrls)
+          ? body.imageUrls.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 4)
+          : [];
+        if (!conversationId || (!userMessage.trim() && imageUrls.length === 0)) {
           return jsonError(400, "Missing conversation or message.");
         }
 

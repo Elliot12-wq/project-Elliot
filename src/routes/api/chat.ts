@@ -51,14 +51,21 @@ export const Route = createFileRoute("/api/chat")({
         if (convErr || !conv) return jsonError(404, "Conversation not found.");
         if (conv.user_id !== userId) return jsonError(403, "Not your conversation.");
 
-        // Persist user message
+        // Persist user message — embed image URLs as markdown so they render in chat
+        const storedContent = [
+          userMessage,
+          ...imageUrls.map((u) => `![image](${u})`),
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
         const { data: userMsgRow, error: insErr } = await supabaseAdmin
           .from("messages")
           .insert({
             conversation_id: conversationId,
             user_id: userId,
             role: "user",
-            content: userMessage,
+            content: storedContent,
           })
           .select("id")
           .single();
@@ -67,12 +74,25 @@ export const Route = createFileRoute("/api/chat")({
           return jsonError(500, "Couldn't save your message.");
         }
 
-        // Build complete history for this conversation.
+        // Build complete history for this conversation (text-only for prior turns).
         const { data: history } = await supabaseAdmin
           .from("messages")
           .select("role, content")
           .eq("conversation_id", conversationId)
           .order("created_at", { ascending: true });
+
+        // Replace the just-stored user turn with a multimodal version so the model sees the image
+        const historyForModel = (history ?? []).map((m, idx, arr) => {
+          const isLastUser = idx === arr.length - 1 && m.role === "user";
+          if (!isLastUser || imageUrls.length === 0) return m;
+          return {
+            role: "user",
+            content: [
+              { type: "text", text: userMessage || "Please look at this image." },
+              ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
+            ],
+          };
+        });
 
         // Memories
         const { data: memRows } = await supabaseAdmin

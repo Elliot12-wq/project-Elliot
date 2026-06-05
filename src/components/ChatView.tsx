@@ -350,6 +350,36 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         onSubmit={onSubmit}
         className="relative border-t border-border/60 bg-background/50 px-4 py-4 backdrop-blur-xl"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            addImages(e.target.files);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+
+        {pendingImages.length > 0 && (
+          <div className="mx-auto mb-2 flex max-w-2xl flex-wrap gap-2">
+            {pendingImages.map((f, i) => (
+              <div key={i} className="group relative h-16 w-16 overflow-hidden rounded-lg border border-border bg-card/40">
+                <img src={URL.createObjectURL(f)} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setPendingImages((prev) => prev.filter((_, j) => j !== i))}
+                  className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5 text-foreground transition hover:bg-destructive hover:text-destructive-foreground"
+                  aria-label="Remove image"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30">
           <textarea
             ref={textareaRef}
@@ -361,6 +391,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             disabled={streaming}
             className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
           />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming || pendingImages.length >= 4}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            aria-label="Attach image"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </button>
 
           <button
             type="button"
@@ -382,7 +422,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           <button
             type={streaming ? "button" : "submit"}
             onClick={streaming ? stopStream : undefined}
-            disabled={!streaming && !input.trim()}
+            disabled={!streaming && !input.trim() && pendingImages.length === 0}
             className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-ember)] transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
             style={{ background: "var(--gradient-ember)" }}
             aria-label={streaming ? "Stop" : "Send"}

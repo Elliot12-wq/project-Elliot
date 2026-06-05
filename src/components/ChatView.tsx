@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
-import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu } from "lucide-react";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
@@ -112,12 +112,50 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     }
   });
 
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addImages(files: FileList | null) {
+    if (!files) return;
+    const next: File[] = [];
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`${f.name} isn't an image.`);
+        continue;
+      }
+      if (f.size > 8 * 1024 * 1024) {
+        toast.error(`${f.name} is over 8MB.`);
+        continue;
+      }
+      next.push(f);
+    }
+    setPendingImages((prev) => [...prev, ...next].slice(0, 4));
+  }
+
+  async function uploadImages(files: File[], userId: string): Promise<string[]> {
+    const urls: string[] = [];
+    for (const f of files) {
+      const ext = (f.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `${userId}/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage.from("chat-images").upload(path, f, {
+        contentType: f.type,
+        upsert: false,
+      });
+      if (error) throw new Error(error.message);
+      const { data } = supabase.storage.from("chat-images").getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+    return urls;
+  }
+
   async function send(text: string) {
     const content = text.trim();
-    if (!content || streaming) return;
+    const imagesToSend = pendingImages;
+    if ((!content && imagesToSend.length === 0) || streaming) return;
     const tempUserId = `tmp-u-${Date.now()}`;
-    setMessages((prev) => [...prev, { id: tempUserId, role: "user", content }]);
+
     setInput("");
+    setPendingImages([]);
     setStreaming(true);
     setStreamingText("");
 
@@ -128,13 +166,23 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       const token = s.session?.access_token;
       if (!token) throw new Error("Not signed in");
 
+      let imageUrls: string[] = [];
+      if (imagesToSend.length > 0) {
+        imageUrls = await uploadImages(imagesToSend, u.user.id);
+      }
+
+      const optimisticContent = [content, ...imageUrls.map((url) => `![image](${url})`)]
+        .filter(Boolean)
+        .join("\n\n");
+      setMessages((prev) => [...prev, { id: tempUserId, role: "user", content: optimisticContent }]);
+
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, userMessage: content }),
+        body: JSON.stringify({ conversationId, userMessage: content, imageUrls }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -302,6 +350,36 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         onSubmit={onSubmit}
         className="relative border-t border-border/60 bg-background/50 px-4 py-4 backdrop-blur-xl"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            addImages(e.target.files);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+
+        {pendingImages.length > 0 && (
+          <div className="mx-auto mb-2 flex max-w-2xl flex-wrap gap-2">
+            {pendingImages.map((f, i) => (
+              <div key={i} className="group relative h-16 w-16 overflow-hidden rounded-lg border border-border bg-card/40">
+                <img src={URL.createObjectURL(f)} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setPendingImages((prev) => prev.filter((_, j) => j !== i))}
+                  className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5 text-foreground transition hover:bg-destructive hover:text-destructive-foreground"
+                  aria-label="Remove image"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30">
           <textarea
             ref={textareaRef}
@@ -313,6 +391,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             disabled={streaming}
             className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
           />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming || pendingImages.length >= 4}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            aria-label="Attach image"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </button>
 
           <button
             type="button"
@@ -334,7 +422,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           <button
             type={streaming ? "button" : "submit"}
             onClick={streaming ? stopStream : undefined}
-            disabled={!streaming && !input.trim()}
+            disabled={!streaming && !input.trim() && pendingImages.length === 0}
             className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-ember)] transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
             style={{ background: "var(--gradient-ember)" }}
             aria-label={streaming ? "Stop" : "Send"}
@@ -353,12 +441,28 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 function Bubble({ role, content, streaming }: { role: "user" | "assistant"; content: string; streaming?: boolean }) {
   const [copied, setCopied] = useState(false);
   if (role === "user") {
+    // Split out markdown image lines so they render as actual images
+    const imgRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+    const images: string[] = [];
+    const textOnly = content.replace(imgRegex, (_m, url) => {
+      images.push(url);
+      return "";
+    }).trim();
     return (
       <div
-        className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
+        className="max-w-[85%] space-y-2 rounded-2xl rounded-br-md px-3 py-2 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
         style={{ background: "var(--gradient-ember)" }}
       >
-        {content}
+        {images.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {images.map((u, i) => (
+              <a key={i} href={u} target="_blank" rel="noreferrer" className="block">
+                <img src={u} alt="" className="max-h-56 max-w-[14rem] rounded-lg object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
+        {textOnly && <div className="px-1 py-0.5 whitespace-pre-wrap">{textOnly}</div>}
       </div>
     );
   }

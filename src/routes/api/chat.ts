@@ -132,7 +132,7 @@ You simply identify as Elliot.${memoryBlock}`;
               stream: true,
               messages: [
                 { role: "system", content: SYSTEM },
-                ...(history ?? []),
+                ...historyForModel,
               ],
             }),
           });

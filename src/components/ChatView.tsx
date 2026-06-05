@@ -112,12 +112,50 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     }
   });
 
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addImages(files: FileList | null) {
+    if (!files) return;
+    const next: File[] = [];
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`${f.name} isn't an image.`);
+        continue;
+      }
+      if (f.size > 8 * 1024 * 1024) {
+        toast.error(`${f.name} is over 8MB.`);
+        continue;
+      }
+      next.push(f);
+    }
+    setPendingImages((prev) => [...prev, ...next].slice(0, 4));
+  }
+
+  async function uploadImages(files: File[], userId: string): Promise<string[]> {
+    const urls: string[] = [];
+    for (const f of files) {
+      const ext = (f.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `${userId}/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage.from("chat-images").upload(path, f, {
+        contentType: f.type,
+        upsert: false,
+      });
+      if (error) throw new Error(error.message);
+      const { data } = supabase.storage.from("chat-images").getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+    return urls;
+  }
+
   async function send(text: string) {
     const content = text.trim();
-    if (!content || streaming) return;
+    const imagesToSend = pendingImages;
+    if ((!content && imagesToSend.length === 0) || streaming) return;
     const tempUserId = `tmp-u-${Date.now()}`;
-    setMessages((prev) => [...prev, { id: tempUserId, role: "user", content }]);
+
     setInput("");
+    setPendingImages([]);
     setStreaming(true);
     setStreamingText("");
 
@@ -128,13 +166,23 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       const token = s.session?.access_token;
       if (!token) throw new Error("Not signed in");
 
+      let imageUrls: string[] = [];
+      if (imagesToSend.length > 0) {
+        imageUrls = await uploadImages(imagesToSend, u.user.id);
+      }
+
+      const optimisticContent = [content, ...imageUrls.map((url) => `![image](${url})`)]
+        .filter(Boolean)
+        .join("\n\n");
+      setMessages((prev) => [...prev, { id: tempUserId, role: "user", content: optimisticContent }]);
+
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, userMessage: content }),
+        body: JSON.stringify({ conversationId, userMessage: content, imageUrls }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {

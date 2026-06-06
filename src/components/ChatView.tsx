@@ -142,8 +142,11 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         upsert: false,
       });
       if (error) throw new Error(error.message);
-      const { data } = supabase.storage.from("chat-images").getPublicUrl(path);
-      urls.push(data.publicUrl);
+      const { data, error: signErr } = await supabase.storage
+        .from("chat-images")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10); // 10 years
+      if (signErr || !data?.signedUrl) throw new Error(signErr?.message || "Couldn't sign image URL");
+      urls.push(data.signedUrl);
     }
     return urls;
   }

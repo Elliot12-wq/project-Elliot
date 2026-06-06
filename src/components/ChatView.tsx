@@ -510,7 +510,40 @@ function Bubble({ role, content, streaming }: { role: "user" | "assistant"; cont
   );
 }
 
+function useElliotGreeting() {
+  return useMemo(() => {
+    const now = new Date();
+    const h = now.getHours();
+    const dow = now.getDay();
+    const date = now.getDate();
+    const monthName = now.toLocaleString(undefined, { month: "long" });
+
+    let timeGreeting: string;
+    if (h >= 5 && h < 12) timeGreeting = "Good morning";
+    else if (h >= 12 && h < 17) timeGreeting = "Good afternoon";
+    else if (h >= 17 && h < 21) timeGreeting = "Good evening";
+    else timeGreeting = "It's night";
+
+    const dayLinesByDow: Record<number, string[]> = {
+      0: ["Sunday calm — ask away.", "Easy Sunday — what's on your mind?"],
+      1: ["You got any questions on Monday?", "Fresh Monday — where do we start?"],
+      2: ["Nice Tuesday, innit?", "Tuesday's quietly productive — let's go."],
+      3: ["Midweek already — what's on your mind?", "Hump-day Wednesday — anything I can help with?"],
+      4: ["Thursday treating you well?", "Almost Friday — what are we working on?"],
+      5: ["Happy Friday — what are we tackling?", "Friday energy — what's the move?"],
+      6: ["Lazy Saturday questions?", "Saturday's yours — how can I help?"],
+    };
+    const variants = dayLinesByDow[dow];
+    const dayLine = variants[date % variants.length];
+
+    const monthBadge = date <= 3 ? `Happy ${monthName} ✦` : null;
+
+    return { timeGreeting, dayLine, monthBadge };
+  }, []);
+}
+
 function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+  const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
       <div className="relative mb-6 h-32 w-32">
@@ -525,10 +558,13 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
           style={{ animation: "elliot-breathe 3.6s ease-in-out infinite" }}
         />
       </div>
-      <h2 className="font-display text-4xl tracking-tight">Hello, I'm Elliot.</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Ask me anything. I think in embers and quietly remember what matters.
-      </p>
+      {monthBadge && (
+        <span className="mb-3 inline-block rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-primary-glow">
+          {monthBadge}
+        </span>
+      )}
+      <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
       <div className="mt-7 flex w-full flex-col gap-2">
         {SUGGESTIONS.map((s) => (
           <button
@@ -544,3 +580,4 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
     </div>
   );
 }
+

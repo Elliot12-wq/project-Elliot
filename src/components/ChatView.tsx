@@ -8,7 +8,8 @@ import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
-import logo from "@/assets/elliot-logo.png";
+import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
+const logo = logoAsset.url;
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
 

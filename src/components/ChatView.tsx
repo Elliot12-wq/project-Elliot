@@ -437,6 +437,9 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         <p className="mx-auto mt-2 max-w-2xl text-center text-[10px] text-muted-foreground/70">
           Elliot quietly remembers things that matter · Enter sends · Shift+Enter for newline
         </p>
+        <p className="mx-auto mt-1 max-w-2xl text-center text-[10px] text-muted-foreground/50">
+          Made by Charlie Nathaniel P. Sagun
+        </p>
       </form>
     </div>
   );

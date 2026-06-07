@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AmbientBackground } from "@/components/AmbientBackground";
-import { guestStore } from "@/hooks/useGuestSession";
 import logo from "@/assets/elliot-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -17,21 +16,12 @@ export const Route = createFileRoute("/")({
   component: IndexRedirect,
 });
 
-// Bounce to /login, an existing conversation, or a new one (auth or guest)
+// Bounce to /login or create a fresh conversation and bounce to /c/$id
 function IndexRedirect() {
   const navigate = useNavigate();
   useEffect(() => {
     let done = false;
-
-    const goGuest = () => {
-      if (done) return;
-      done = true;
-      const existing = guestStore.listConversations();
-      const target = existing[0] ?? guestStore.createConversation();
-      navigate({ to: "/c/$id", params: { id: target.id }, replace: true });
-    };
-
-    const goAuth = async (userId: string) => {
+    const go = async (userId: string) => {
       if (done) return;
       done = true;
       const { data: latest } = await supabase
@@ -58,29 +48,23 @@ function IndexRedirect() {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       if (s.session) {
-        goAuth(s.session.user.id);
-        return;
+        go(s.session.user.id);
+      } else {
+        // Wait briefly for auth to hydrate; fall back to /login
+        const t = setTimeout(() => {
+          if (!done) {
+            done = true;
+            navigate({ to: "/login", replace: true });
+          }
+        }, 1200);
+        const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+          if (session && !done) {
+            clearTimeout(t);
+            go(session.user.id);
+            sub.subscription.unsubscribe();
+          }
+        });
       }
-      if (guestStore.isGuest()) {
-        goGuest();
-        return;
-      }
-      // Wait briefly for auth to hydrate; fall back to /login
-      const t = setTimeout(() => {
-        if (done) return;
-        if (guestStore.isGuest()) goGuest();
-        else {
-          done = true;
-          navigate({ to: "/login", replace: true });
-        }
-      }, 1200);
-      const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-        if (session && !done) {
-          clearTimeout(t);
-          goAuth(session.user.id);
-          sub.subscription.unsubscribe();
-        }
-      });
     })();
   }, [navigate]);
 

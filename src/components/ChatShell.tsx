@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { Toaster } from "@/components/ui/sonner";
-import { guestStore } from "@/hooks/useGuestSession";
 import logo from "@/assets/elliot-logo.png";
 
 const ShellCtx = createContext<{ openSidebar: () => void } | null>(null);
@@ -18,17 +17,13 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
 
   useEffect(() => {
     let alive = true;
-    if (guestStore.isGuest()) {
-      setReady(true);
-      return;
-    }
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
       if (!data.session) navigate({ to: "/login", replace: true });
       else setReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session && !guestStore.isGuest()) navigate({ to: "/login", replace: true });
+      if (!session) navigate({ to: "/login", replace: true });
     });
     return () => {
       alive = false;

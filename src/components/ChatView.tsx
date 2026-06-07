@@ -1,58 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
-import {
-  Send,
-  Square,
-  Mic,
-  MicOff,
-  Copy,
-  Check,
-  RotateCw,
-  Menu,
-  ImagePlus,
-  X,
-  ChevronDown,
-  Lock,
-} from "lucide-react";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
-import { guestStore, useIsGuest, type GuestMsg } from "@/hooks/useGuestSession";
-import {
-  ELLIOT_VERSIONS,
-  DEFAULT_ELLIOT_VERSION,
-  getElliotVersion,
-  type ElliotVersionId,
-} from "@/lib/elliot-models";
 import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
 const logo = logoAsset.url;
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
-
-const VERSION_STORAGE_KEY = "elliot:version";
-
-function useSelectedVersion(): [ElliotVersionId, (v: ElliotVersionId) => void] {
-  const [v, setV] = useState<ElliotVersionId>(() => {
-    if (typeof window === "undefined") return DEFAULT_ELLIOT_VERSION;
-    const stored = window.localStorage.getItem(VERSION_STORAGE_KEY);
-    if (stored && stored in ELLIOT_VERSIONS) return stored as ElliotVersionId;
-    return DEFAULT_ELLIOT_VERSION;
-  });
-  const set = (next: ElliotVersionId) => {
-    setV(next);
-    try {
-      window.localStorage.setItem(VERSION_STORAGE_KEY, next);
-    } catch {
-      /* quota */
-    }
-  };
-  return [v, set];
-}
 
 function mergeMessages(existing: Msg[], incoming: Msg[]) {
   const merged = [...existing];
@@ -81,39 +40,20 @@ const SUGGESTIONS = [
 
 export function ChatView({ conversationId }: { conversationId: string }) {
   const shell = useShell();
-  const navigate = useNavigate();
-  const isGuest = useIsGuest();
   const onToggleSidebar = shell?.openSidebar;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [versionId, setVersionId] = useSelectedVersion();
-  const version = getElliotVersion(versionId);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const interimRef = useRef("");
 
-  // Load history — guest reads localStorage, signed-in reads Supabase
+  // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
     let alive = true;
     setStreamingText("");
-
-    if (isGuest) {
-      const local = guestStore.listMessages(conversationId).map<Msg>((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        created_at: m.created_at,
-      }));
-      setMessages(local);
-      return () => {
-        alive = false;
-        abortRef.current?.abort();
-      };
-    }
-
     supabase
       .from("messages")
       .select("id,role,content,created_at")
@@ -129,6 +69,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
         setMessages((data as Msg[]) ?? []);
       });
 
+    // Realtime: catch newly-persisted assistant replies even if streaming swap-in fails
     const channel = supabase
       .channel(`msgs-${conversationId}-${Date.now()}`)
       .on(
@@ -149,7 +90,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       abortRef.current?.abort();
       supabase.removeChannel(channel);
     };
-  }, [conversationId, isGuest]);
+  }, [conversationId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -211,94 +152,43 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     return urls;
   }
 
-  function requireSignIn(reason: string) {
-    toast.error(`Sign in to ${reason}.`);
-    setTimeout(() => navigate({ to: "/login" }), 600);
-  }
-
   async function send(text: string) {
     const content = text.trim();
-    const imagesToSend = isGuest ? [] : pendingImages;
+    const imagesToSend = pendingImages;
     if ((!content && imagesToSend.length === 0) || streaming) return;
     const tempUserId = `tmp-u-${Date.now()}`;
 
     setInput("");
-    if (!isGuest) setPendingImages([]);
+    setPendingImages([]);
     setStreaming(true);
     setStreamingText("");
 
     try {
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError || !u.user) throw new Error("Session expired. Sign in again.");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) throw new Error("Not signed in");
+
+      let imageUrls: string[] = [];
+      if (imagesToSend.length > 0) {
+        imageUrls = await uploadImages(imagesToSend, u.user.id);
+      }
+
+      const optimisticContent = [content, ...imageUrls.map((url) => `![image](${url})`)]
+        .filter(Boolean)
+        .join("\n\n");
+      setMessages((prev) => [...prev, { id: tempUserId, role: "user", content: optimisticContent }]);
+
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      let res: Response;
-
-      if (isGuest) {
-        // Optimistic local user message
-        const nowIso = new Date().toISOString();
-        const userMsg: GuestMsg = {
-          id: tempUserId,
-          role: "user",
-          content,
-          created_at: nowIso,
-        };
-        setMessages((prev) => [...prev, { ...userMsg }]);
-        guestStore.appendMessage(conversationId, userMsg);
-
-        // Auto-title guest convo from first user message
-        const conv = guestStore.getConversation(conversationId);
-        if (conv && conv.title === "New chat") {
-          guestStore.renameConversation(conversationId, content.slice(0, 60));
-        }
-
-        // Build a trimmed history of prior turns (exclude the just-added user msg)
-        const prior = guestStore
-          .listMessages(conversationId)
-          .filter((m) => m.id !== tempUserId)
-          .slice(-20)
-          .map((m) => ({ role: m.role, content: m.content }));
-
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            guest: true,
-            version: versionId,
-            userMessage: content,
-            history: prior,
-          }),
-          signal: ctrl.signal,
-        });
-      } else {
-        const { data: u, error: userError } = await supabase.auth.getUser();
-        if (userError || !u.user) throw new Error("Session expired. Sign in again.");
-        const { data: s } = await supabase.auth.getSession();
-        const token = s.session?.access_token;
-        if (!token) throw new Error("Not signed in");
-
-        let imageUrls: string[] = [];
-        if (imagesToSend.length > 0) {
-          imageUrls = await uploadImages(imagesToSend, u.user.id);
-        }
-
-        const optimisticContent = [content, ...imageUrls.map((url) => `![image](${url})`)]
-          .filter(Boolean)
-          .join("\n\n");
-        setMessages((prev) => [...prev, { id: tempUserId, role: "user", content: optimisticContent }]);
-
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            conversationId,
-            userMessage: content,
-            imageUrls,
-            version: versionId,
-          }),
-          signal: ctrl.signal,
-        });
-      }
-
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ conversationId, userMessage: content, imageUrls }),
+        signal: ctrl.signal,
+      });
       if (!res.ok || !res.body) {
         let msg = `Couldn't reach Elliot (HTTP ${res.status}).`;
         try {
@@ -321,29 +211,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       }
 
       if (acc.trim()) {
-        const assistantId = `tmp-a-${Date.now()}`;
-        if (isGuest) {
-          const msg: GuestMsg = {
-            id: assistantId,
-            role: "assistant",
-            content: acc,
-            created_at: new Date().toISOString(),
-          };
-          guestStore.appendMessage(conversationId, msg);
-          setMessages((prev) => mergeMessages(prev, [msg]));
-        } else {
-          setMessages((prev) => mergeMessages(prev, [{ id: assistantId, role: "assistant", content: acc }]));
-        }
+        setMessages((prev) => mergeMessages(prev, [{ id: `tmp-a-${Date.now()}`, role: "assistant", content: acc }]));
       }
 
-      if (!isGuest) {
-        const { data } = await supabase
-          .from("messages")
-          .select("id,role,content,created_at")
-          .eq("conversation_id", conversationId)
-          .order("created_at", { ascending: true });
-        if (data) setMessages((prev) => mergeMessages(prev, data as Msg[]));
-      }
+      // Refresh from DB — realtime may have already added rows
+      const { data } = await supabase
+        .from("messages")
+        .select("id,role,content,created_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+      if (data) setMessages((prev) => mergeMessages(prev, data as Msg[]));
       setStreamingText("");
     } catch (err: any) {
       if (err?.name !== "AbortError") {
@@ -358,38 +235,17 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   }
 
   async function regenerate() {
+    // Find last user message, delete subsequent assistant message(s), resend
     const lastUserIdx = [...messages].reverse().findIndex((m) => m.role === "user");
     if (lastUserIdx === -1 || streaming) return;
     const realIdx = messages.length - 1 - lastUserIdx;
     const lastUser = messages[realIdx];
-
-    if (isGuest) {
-      // Drop assistant messages after the last user message from local store
-      const trimmed = messages.slice(0, realIdx);
-      setMessages(trimmed);
-      // Rewrite localStorage to reflect the trim, but keep the user message — send() re-appends it.
-      const keep = trimmed.map<GuestMsg>((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        created_at: m.created_at ?? new Date().toISOString(),
-      }));
-      try {
-        window.localStorage.setItem(
-          `elliot:guest:messages:${conversationId}`,
-          JSON.stringify(keep),
-        );
-      } catch {
-        /* quota */
-      }
-      send(lastUser.content);
-      return;
-    }
-
+    // delete all messages after the last user message
     const toDelete = messages.slice(realIdx + 1).map((m) => m.id).filter((id) => !id.startsWith("tmp"));
     if (toDelete.length) {
       await supabase.from("messages").delete().in("id", toDelete);
     }
+    // Also delete the last user message — send() will re-insert it server-side
     if (!lastUser.id.startsWith("tmp")) {
       await supabase.from("messages").delete().eq("id", lastUser.id);
     }
@@ -429,39 +285,22 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             <Menu className="h-4 w-4" />
           </button>
         )}
-        <div className="relative h-9 w-9 shrink-0">
+        <div className="relative h-9 w-9">
           <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
           <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
         </div>
-        <div className="flex min-w-0 flex-col leading-tight">
+        <div className="flex flex-col leading-tight">
           <h1 className="font-display text-xl tracking-tight">Elliot</h1>
-          <span className="truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Woven from memory · forged in red
           </span>
         </div>
-        <div className="ml-auto">
-          <VersionPicker value={versionId} onChange={setVersionId} />
-        </div>
       </header>
-
-      {isGuest && (
-        <div className="border-b border-primary/20 bg-primary/[0.06] px-4 py-2 text-center text-[11px] text-foreground/75">
-          You're chatting as a guest.{" "}
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/login" })}
-            className="font-medium text-primary-glow underline underline-offset-2"
-          >
-            Sign in
-          </button>{" "}
-          to save across devices, send images, and use voice.
-        </div>
-      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
         {empty ? (
-          <EmptyState onPick={send} activeVersionLabel={version.label} activeTagline={version.tagline} />
+          <EmptyState onPick={send} />
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <AnimatePresence initial={false}>
@@ -559,39 +398,29 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 
           <button
             type="button"
-            onClick={() => {
-              if (isGuest) return requireSignIn("send images");
-              fileInputRef.current?.click();
-            }}
-            disabled={streaming || (!isGuest && pendingImages.length >= 4)}
-            title={isGuest ? "Sign in to send images" : "Attach image"}
-            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
-            aria-label={isGuest ? "Sign in to send images" : "Attach image"}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming || pendingImages.length >= 4}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            aria-label="Attach image"
           >
             <ImagePlus className="h-4 w-4" />
-            {isGuest && <Lock className="absolute -right-1 -top-1 h-3 w-3 text-primary-glow" />}
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              if (isGuest) return requireSignIn("use voice input");
-              speech.listening ? speech.stop() : speech.start();
-            }}
+            onClick={speech.listening ? speech.stop : speech.start}
             disabled={streaming}
-            title={isGuest ? "Sign in to use voice input" : speech.listening ? "Stop voice input" : "Voice input"}
             className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
-              speech.listening && !isGuest
+              speech.listening
                 ? "border-primary/60 bg-primary/15 text-primary-glow"
                 : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
             }`}
             aria-label={speech.listening ? "Stop voice input" : "Voice input"}
           >
-            {speech.listening && !isGuest ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            {speech.listening && !isGuest && (
+            {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {speech.listening && (
               <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
             )}
-            {isGuest && <Lock className="absolute -right-1 -top-1 h-3 w-3 text-primary-glow" />}
           </button>
 
           <button
@@ -616,70 +445,10 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   );
 }
 
-function VersionPicker({
-  value,
-  onChange,
-}: {
-  value: ElliotVersionId;
-  onChange: (v: ElliotVersionId) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [open]);
-  const current = getElliotVersion(value);
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-lg border border-border bg-background/40 px-2.5 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/70"
-        aria-label="Switch Elliot version"
-      >
-        <span className="hidden sm:inline">{current.label}</span>
-        <span className="sm:hidden">v{current.id}</span>
-        <ChevronDown className={`h-3 w-3 transition ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl">
-          {(Object.keys(ELLIOT_VERSIONS) as ElliotVersionId[]).map((id) => {
-            const v = ELLIOT_VERSIONS[id];
-            const active = id === value;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  onChange(id);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition ${
-                  active ? "bg-primary/10" : "hover:bg-background/60"
-                }`}
-              >
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground">{v.label}</div>
-                  <div className="text-[11px] text-muted-foreground">{v.tagline}</div>
-                </div>
-                {active && <Check className="mt-1 h-3.5 w-3.5 text-primary-glow" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function Bubble({ role, content, streaming }: { role: "user" | "assistant"; content: string; streaming?: boolean }) {
   const [copied, setCopied] = useState(false);
   if (role === "user") {
+    // Split out markdown image lines so they render as actual images
     const imgRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
     const images: string[] = [];
     const textOnly = content.replace(imgRegex, (_m, url) => {
@@ -776,15 +545,7 @@ function useElliotGreeting() {
   }, []);
 }
 
-function EmptyState({
-  onPick,
-  activeVersionLabel,
-  activeTagline,
-}: {
-  onPick: (s: string) => void;
-  activeVersionLabel: string;
-  activeTagline: string;
-}) {
+function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
@@ -807,9 +568,6 @@ function EmptyState({
       )}
       <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
       <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
-      <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-primary-glow/80">
-        {activeVersionLabel} · <span className="text-muted-foreground normal-case tracking-normal">{activeTagline}</span>
-      </p>
       <div className="mt-7 flex w-full flex-col gap-2">
         {SUGGESTIONS.map((s) => (
           <button
@@ -825,3 +583,4 @@ function EmptyState({
     </div>
   );
 }
+

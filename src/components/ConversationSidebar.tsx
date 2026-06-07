@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Search, Trash2, LogOut, MessageSquare, X } from "lucide-react";
+import { Plus, Search, Trash2, LogOut, MessageSquare, X, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { guestStore, useIsGuest } from "@/hooks/useGuestSession";
 import logo from "@/assets/elliot-logo.png";
 
 type Conv = { id: string; title: string; updated_at: string };
@@ -17,9 +18,25 @@ export function ConversationSidebar({
   const [list, setList] = useState<Conv[]>([]);
   const [q, setQ] = useState("");
   const navigate = useNavigate();
+  const isGuest = useIsGuest();
 
   useEffect(() => {
     let alive = true;
+
+    if (isGuest) {
+      const refresh = () => alive && setList(guestStore.listConversations());
+      refresh();
+      const onStorage = () => refresh();
+      window.addEventListener("storage", onStorage);
+      // Light polling so same-tab updates surface
+      const poll = window.setInterval(refresh, 1500);
+      return () => {
+        alive = false;
+        window.removeEventListener("storage", onStorage);
+        window.clearInterval(poll);
+      };
+    }
+
     const load = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
@@ -42,9 +59,16 @@ export function ConversationSidebar({
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isGuest]);
 
   async function newChat() {
+    if (isGuest) {
+      const conv = guestStore.createConversation();
+      setList(guestStore.listConversations());
+      onClose?.();
+      window.setTimeout(() => navigate({ to: "/c/$id", params: { id: conv.id } }), 0);
+      return;
+    }
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const { data, error } = await supabase
@@ -60,9 +84,14 @@ export function ConversationSidebar({
   async function remove(id: string, title: string) {
     const ok = window.confirm(`Delete “${title || "this chat"}”? This removes the whole conversation.`);
     if (!ok) return;
-    const { error } = await supabase.from("conversations").delete().eq("id", id);
-    if (error) return toast.error("Couldn't delete that chat.");
-    setList((l) => l.filter((c) => c.id !== id));
+    if (isGuest) {
+      guestStore.deleteConversation(id);
+      setList(guestStore.listConversations());
+    } else {
+      const { error } = await supabase.from("conversations").delete().eq("id", id);
+      if (error) return toast.error("Couldn't delete that chat.");
+      setList((l) => l.filter((c) => c.id !== id));
+    }
     toast.success("Chat deleted.");
     if (id === activeId) {
       onClose?.();
@@ -71,6 +100,11 @@ export function ConversationSidebar({
   }
 
   async function signOut() {
+    if (isGuest) {
+      guestStore.disable();
+      navigate({ to: "/login" });
+      return;
+    }
     await supabase.auth.signOut();
     navigate({ to: "/login" });
   }
@@ -95,6 +129,12 @@ export function ConversationSidebar({
           </button>
         )}
       </div>
+
+      {isGuest && (
+        <div className="mx-3 mb-3 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] text-foreground/80">
+          Guest mode — chats live on this device only.
+        </div>
+      )}
 
       <button
         onClick={newChat}
@@ -163,7 +203,15 @@ export function ConversationSidebar({
         onClick={signOut}
         className="m-3 flex items-center justify-center gap-2 rounded-lg border border-border bg-background/40 py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
       >
-        <LogOut className="h-3.5 w-3.5" /> Sign out
+        {isGuest ? (
+          <>
+            <UserPlus className="h-3.5 w-3.5" /> Sign in
+          </>
+        ) : (
+          <>
+            <LogOut className="h-3.5 w-3.5" /> Sign out
+          </>
+        )}
       </button>
     </aside>
   );

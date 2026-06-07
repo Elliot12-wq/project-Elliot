@@ -147,6 +147,22 @@ function LoginPage() {
             <GoogleIcon /> Continue with Google
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              import("@/hooks/useGuestSession").then(({ guestStore }) => {
+                guestStore.enable();
+                navigate({ to: "/", replace: true });
+              });
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-transparent py-3 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+          >
+            Continue as guest
+          </button>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground/70">
+            Guests can chat with Elliot. Sign in to send images, use voice, and sync across devices.
+          </p>
+
           <p className="mt-5 text-center text-xs text-muted-foreground">
             {mode === "signin" ? "New to Elliot?" : "Already have an account?"}{" "}
             <button

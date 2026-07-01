@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/chat")({
         }
         const userId = userData.user.id;
 
-        let body: { conversationId?: string; userMessage?: string; imageUrls?: string[] };
+        let body: { conversationId?: string; userMessage?: string; imageUrls?: string[]; tier?: string };
         try {
           body = await request.json();
         } catch {
@@ -45,6 +45,8 @@ export const Route = createFileRoute("/api/chat")({
         const imageUrls = Array.isArray(body.imageUrls)
           ? body.imageUrls.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 4)
           : [];
+        const tier = String(body.tier ?? "1.2");
+        const CHAT_MODEL = TIER_TO_MODEL[tier] ?? DEFAULT_MODEL;
         if (!conversationId || (!userMessage.trim() && imageUrls.length === 0)) {
           return jsonError(400, "Missing conversation or message.");
         }

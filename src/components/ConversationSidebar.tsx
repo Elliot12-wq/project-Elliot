@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Search, Trash2, LogOut, MessageSquare, X } from "lucide-react";
+import { Plus, Search, Trash2, LogOut, MessageSquare, X, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logo from "@/assets/elliot-logo.png";
+import { InstructionsDialog } from "@/components/InstructionsDialog";
 
 type Conv = { id: string; title: string; updated_at: string };
 

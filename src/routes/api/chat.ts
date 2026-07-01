@@ -2,8 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const AI_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const CHAT_MODEL = "google/gemini-3-flash-preview";
-const SMALL_MODEL = "google/gemini-3.1-flash-lite-preview";
+const SMALL_MODEL = "google/gemini-2.5-flash-lite";
+
+const TIER_TO_MODEL: Record<string, string> = {
+  "1.0": "google/gemini-2.5-flash-lite",
+  "1.2": "google/gemini-2.5-flash",
+  "2.2": "google/gemini-2.5-pro",
+  "2.3": "google/gemini-2.5-pro",
+};
+const DEFAULT_MODEL = TIER_TO_MODEL["1.2"];
 
 const jsonError = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {

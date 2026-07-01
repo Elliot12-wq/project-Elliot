@@ -592,6 +592,11 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
       )}
       <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
       <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
+      <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
+        <span className="text-primary-glow">{tier.name.toUpperCase()}</span>
+        <span className="mx-2 text-muted-foreground/50">·</span>
+        <span>{tier.tagline}</span>
+      </p>
       <div className="mt-7 flex w-full flex-col gap-2">
         {SUGGESTIONS.map((s) => (
           <button

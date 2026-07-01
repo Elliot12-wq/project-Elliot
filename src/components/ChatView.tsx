@@ -324,7 +324,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
         {empty ? (
-          <EmptyState onPick={send} />
+          <EmptyState onPick={send} tier={activeTier} />
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <AnimatePresence initial={false}>

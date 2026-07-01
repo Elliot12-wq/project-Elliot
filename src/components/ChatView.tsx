@@ -60,6 +60,19 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const interimRef = useRef("");
 
+  const [tier, setTierState] = useState<TierId>(() => {
+    if (typeof window === "undefined") return DEFAULT_TIER;
+    const raw = window.localStorage.getItem(STORAGE_KEY) as TierId | null;
+    return raw && TIERS.some((t) => t.id === raw) ? raw : DEFAULT_TIER;
+  });
+  const setTier = (id: TierId) => {
+    setTierState(id);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, id);
+    } catch {}
+  };
+  const activeTier = TIERS.find((t) => t.id === tier) ?? TIERS[1];
+
   // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
     let alive = true;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
-import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X } from "lucide-react";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
@@ -10,6 +10,16 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
 import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
 const logo = logoAsset.url;
+
+type TierId = "1.0" | "1.2" | "2.2" | "2.3";
+const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
+  { id: "1.0", name: "Elliot 1.0", tagline: "Fastest — instant replies" },
+  { id: "1.2", name: "Elliot 1.2", tagline: "Balanced — everyday assistant" },
+  { id: "2.2", name: "Elliot 2.2", tagline: "Most accurate — careful, precise" },
+  { id: "2.3", name: "Elliot 2.3", tagline: "Best reasoning — deep, multi-step" },
+];
+const DEFAULT_TIER: TierId = "1.2";
+const STORAGE_KEY = "elliot.tier";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
 

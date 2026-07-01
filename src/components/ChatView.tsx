@@ -297,27 +297,28 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-3 border-b border-border/60 bg-background/40 px-4 py-3 backdrop-blur-xl">
+      <header className="flex items-center gap-2 border-b border-border/60 bg-background/40 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
         {onToggleSidebar && (
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
+            className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
             aria-label="Open chats"
           >
             <Menu className="h-4 w-4" />
           </button>
         )}
-        <div className="relative h-9 w-9">
+        <div className="relative h-9 w-9 shrink-0">
           <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
           <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
         </div>
-        <div className="flex flex-col leading-tight">
+        <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <h1 className="font-display text-xl tracking-tight">Elliot</h1>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Woven from memory · forged in red
           </span>
         </div>
+        <ModelPicker tier={tier} onChange={setTier} />
       </header>
 
       {/* Messages */}

@@ -17,6 +17,7 @@ export function ConversationSidebar({
 }) {
   const [list, setList] = useState<Conv[]>([]);
   const [q, setQ] = useState("");
+  const [instrOpen, setInstrOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {

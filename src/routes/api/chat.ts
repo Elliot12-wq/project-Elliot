@@ -170,7 +170,8 @@ You simply identify as Elliot.${instructionsBlock}${memoryBlock}`;
           console.error("AI gateway error", aiRes.status, text);
           if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again in a moment.");
           if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted. Add credits in Workspace usage to continue.");
-          return jsonError(502, "Elliot couldn't start a response. Please try again.");
+          if (aiRes.status === 400) return jsonError(400, `Model refused this request: ${text.slice(0, 200) || "bad request"}`);
+          return jsonError(502, `Elliot couldn't start a response (upstream ${aiRes.status}).`);
         }
 
         const encoder = new TextEncoder();

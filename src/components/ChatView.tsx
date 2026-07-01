@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
-import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X } from "lucide-react";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
@@ -10,6 +10,16 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
 import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
 const logo = logoAsset.url;
+
+type TierId = "1.0" | "1.2" | "2.2" | "2.3";
+const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
+  { id: "1.0", name: "Elliot 1.0", tagline: "Fastest — instant replies" },
+  { id: "1.2", name: "Elliot 1.2", tagline: "Balanced — everyday assistant" },
+  { id: "2.2", name: "Elliot 2.2", tagline: "Most accurate — careful, precise" },
+  { id: "2.3", name: "Elliot 2.3", tagline: "Best reasoning — deep, multi-step" },
+];
+const DEFAULT_TIER: TierId = "1.2";
+const STORAGE_KEY = "elliot.tier";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
 
@@ -49,6 +59,19 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const interimRef = useRef("");
+
+  const [tier, setTierState] = useState<TierId>(() => {
+    if (typeof window === "undefined") return DEFAULT_TIER;
+    const raw = window.localStorage.getItem(STORAGE_KEY) as TierId | null;
+    return raw && TIERS.some((t) => t.id === raw) ? raw : DEFAULT_TIER;
+  });
+  const setTier = (id: TierId) => {
+    setTierState(id);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, id);
+    } catch {}
+  };
+  const activeTier = TIERS.find((t) => t.id === tier) ?? TIERS[1];
 
   // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
@@ -186,7 +209,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, userMessage: content, imageUrls }),
+        body: JSON.stringify({ conversationId, userMessage: content, imageUrls, tier }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -274,33 +297,34 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-3 border-b border-border/60 bg-background/40 px-4 py-3 backdrop-blur-xl">
+      <header className="flex items-center gap-2 border-b border-border/60 bg-background/40 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
         {onToggleSidebar && (
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
+            className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
             aria-label="Open chats"
           >
             <Menu className="h-4 w-4" />
           </button>
         )}
-        <div className="relative h-9 w-9">
+        <div className="relative h-9 w-9 shrink-0">
           <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
           <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
         </div>
-        <div className="flex flex-col leading-tight">
+        <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <h1 className="font-display text-xl tracking-tight">Elliot</h1>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Woven from memory · forged in red
           </span>
         </div>
+        <ModelPicker tier={tier} onChange={setTier} />
       </header>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
         {empty ? (
-          <EmptyState onPick={send} />
+          <EmptyState onPick={send} tier={activeTier} />
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <AnimatePresence initial={false}>
@@ -545,7 +569,7 @@ function useElliotGreeting() {
   }, []);
 }
 
-function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id: TierId; name: string; tagline: string } }) {
   const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
@@ -568,6 +592,11 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
       )}
       <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
       <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
+      <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
+        <span className="text-primary-glow">{tier.name.toUpperCase()}</span>
+        <span className="mx-2 text-muted-foreground/50">·</span>
+        <span>{tier.tagline}</span>
+      </p>
       <div className="mt-7 flex w-full flex-col gap-2">
         {SUGGESTIONS.map((s) => (
           <button
@@ -584,3 +613,57 @@ function EmptyState({ onPick }: { onPick: (s: string) => void }) {
   );
 }
 
+
+function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-full border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        v{tier}
+        <ChevronDown className={`h-3 w-3 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl"
+        >
+          {TIERS.map((t) => (
+            <button
+              key={t.id}
+              role="option"
+              aria-selected={t.id === tier}
+              onClick={() => {
+                onChange(t.id);
+                setOpen(false);
+              }}
+              className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-primary/10 ${
+                t.id === tier ? "bg-primary/5" : ""
+              }`}
+            >
+              <div className="flex-1">
+                <div className="text-sm font-medium text-foreground">{t.name}</div>
+                <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
+              </div>
+              {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

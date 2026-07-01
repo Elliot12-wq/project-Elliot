@@ -2,8 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const AI_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const CHAT_MODEL = "google/gemini-3-flash-preview";
-const SMALL_MODEL = "google/gemini-3.1-flash-lite-preview";
+const SMALL_MODEL = "google/gemini-2.5-flash-lite";
+
+const TIER_TO_MODEL: Record<string, string> = {
+  "1.0": "google/gemini-2.5-flash-lite",
+  "1.2": "google/gemini-2.5-flash",
+  "2.2": "google/gemini-2.5-pro",
+  "2.3": "google/gemini-2.5-pro",
+};
+const DEFAULT_MODEL = TIER_TO_MODEL["1.2"];
 
 const jsonError = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {
@@ -27,7 +34,7 @@ export const Route = createFileRoute("/api/chat")({
         }
         const userId = userData.user.id;
 
-        let body: { conversationId?: string; userMessage?: string; imageUrls?: string[] };
+        let body: { conversationId?: string; userMessage?: string; imageUrls?: string[]; tier?: string };
         try {
           body = await request.json();
         } catch {
@@ -38,6 +45,8 @@ export const Route = createFileRoute("/api/chat")({
         const imageUrls = Array.isArray(body.imageUrls)
           ? body.imageUrls.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 4)
           : [];
+        const tier = String(body.tier ?? "1.2");
+        const CHAT_MODEL = TIER_TO_MODEL[tier] ?? DEFAULT_MODEL;
         if (!conversationId || (!userMessage.trim() && imageUrls.length === 0)) {
           return jsonError(400, "Missing conversation or message.");
         }
@@ -94,23 +103,38 @@ export const Route = createFileRoute("/api/chat")({
           };
         });
 
-        // Memories
-        const { data: memRows } = await supabaseAdmin
-          .from("memories")
-          .select("key, value")
-          .eq("user_id", userId)
-          .order("updated_at", { ascending: false })
-          .limit(50);
-
-        const memoryBlock = memRows && memRows.length
-          ? `\n\nWHAT YOU REMEMBER ABOUT THIS USER (use naturally, never list them back):\n${memRows
+        // Memory: only inject when this is a continuing conversation.
+        // A brand-new chat starts memory-free; the just-inserted user turn is history[length-1].
+        const priorTurns = Math.max(0, (history?.length ?? 0) - 1);
+        let memoryBlock = "";
+        if (priorTurns > 0) {
+          const { data: memRows } = await supabaseAdmin
+            .from("memories")
+            .select("key, value")
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(50);
+          if (memRows && memRows.length) {
+            memoryBlock = `\n\nWHAT YOU REMEMBER ABOUT THIS USER (use naturally, never list them back):\n${memRows
               .map((m) => `- ${m.key}: ${m.value}`)
-              .join("\n")}`
+              .join("\n")}`;
+          }
+        }
+
+        // Custom user instructions apply to every conversation.
+        const { data: instrRow } = await supabaseAdmin
+          .from("user_instructions")
+          .select("content")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const instructions = (instrRow?.content ?? "").trim();
+        const instructionsBlock = instructions
+          ? `\n\nUSER'S CUSTOM INSTRUCTIONS (follow these unless they conflict with safety):\n${instructions}`
           : "";
 
         const SYSTEM = `You are Elliot, a thoughtful, creative, warmly confident AI assistant.
 Calm, intelligent, a little poetic — never robotic. Use markdown when it helps (lists, code, emphasis).
-You simply identify as Elliot.${memoryBlock}`;
+You simply identify as Elliot.${instructionsBlock}${memoryBlock}`;
 
         const aiKey = process.env.LOVABLE_API_KEY;
         if (!aiKey) {
@@ -146,7 +170,8 @@ You simply identify as Elliot.${memoryBlock}`;
           console.error("AI gateway error", aiRes.status, text);
           if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again in a moment.");
           if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted. Add credits in Workspace usage to continue.");
-          return jsonError(502, "Elliot couldn't start a response. Please try again.");
+          if (aiRes.status === 400) return jsonError(400, `Model refused this request: ${text.slice(0, 200) || "bad request"}`);
+          return jsonError(502, `Elliot couldn't start a response (upstream ${aiRes.status}).`);
         }
 
         const encoder = new TextEncoder();

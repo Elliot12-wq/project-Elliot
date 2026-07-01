@@ -209,7 +209,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, userMessage: content, imageUrls }),
+        body: JSON.stringify({ conversationId, userMessage: content, imageUrls, tier }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {

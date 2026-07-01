@@ -161,12 +161,21 @@ export function ConversationSidebar({
         )}
       </nav>
 
-      <button
-        onClick={signOut}
-        className="m-3 flex items-center justify-center gap-2 rounded-lg border border-border bg-background/40 py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
-      >
-        <LogOut className="h-3.5 w-3.5" /> Sign out
-      </button>
+      <div className="m-3 flex flex-col gap-2">
+        <button
+          onClick={() => setInstrOpen(true)}
+          className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2 text-xs text-foreground/90 transition hover:border-primary/60 hover:bg-primary/10"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-primary-glow" /> Custom instructions
+        </button>
+        <button
+          onClick={signOut}
+          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background/40 py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Sign out
+        </button>
+      </div>
+      <InstructionsDialog open={instrOpen} onClose={() => setInstrOpen(false)} />
     </aside>
   );
 }

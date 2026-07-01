@@ -569,7 +569,7 @@ function useElliotGreeting() {
   }, []);
 }
 
-function EmptyState({ onPick }: { onPick: (s: string) => void }) {
+function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id: TierId; name: string; tagline: string } }) {
   const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">

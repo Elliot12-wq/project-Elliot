@@ -620,54 +620,112 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
 
 function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  const place = () => {
+    const b = btnRef.current?.getBoundingClientRect();
+    if (b) setRect({ top: b.bottom + 8, right: window.innerWidth - b.right });
+  };
+
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    place();
+    const onDoc = (e: MouseEvent | TouchEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [open]);
+
+  const list = (
+    <div
+      ref={popRef}
+      role="listbox"
+      className={
+        isMobile
+          ? "animate-sheet-up fixed inset-x-3 bottom-3 z-[2000] overflow-hidden rounded-2xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl safe-bottom"
+          : "animate-pop-in fixed z-[2000] w-72 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl"
+      }
+      style={isMobile ? undefined : { top: rect?.top ?? 0, right: rect?.right ?? 12 }}
+    >
+      {isMobile && (
+        <div className="px-4 pb-1 pt-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Choose a model
+        </div>
+      )}
+      {TIERS.map((t, i) => (
+        <button
+          key={t.id}
+          role="option"
+          aria-selected={t.id === tier}
+          onClick={() => {
+            onChange(t.id);
+            setOpen(false);
+          }}
+          className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
+            t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+          }`}
+          style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-foreground">{t.name}</div>
+            <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
+          </div>
+          {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div className="shrink-0">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-full border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60"
+        className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-background/50 px-3 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60 active:scale-95"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         v{tier}
         <ChevronDown className={`h-3 w-3 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div
-          role="listbox"
-          className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl"
-        >
-          {TIERS.map((t) => (
-            <button
-              key={t.id}
-              role="option"
-              aria-selected={t.id === tier}
-              onClick={() => {
-                onChange(t.id);
-                setOpen(false);
-              }}
-              className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-primary/10 ${
-                t.id === tier ? "bg-primary/5" : ""
-              }`}
-            >
-              <div className="flex-1">
-                <div className="text-sm font-medium text-foreground">{t.name}</div>
-                <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
-              </div>
-              {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <>
+              {isMobile && (
+                <div className="fixed inset-0 z-[1999] bg-background/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+              )}
+              {list}
+            </>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
+

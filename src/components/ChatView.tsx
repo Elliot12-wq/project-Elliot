@@ -297,29 +297,33 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-2 border-b border-border/60 bg-background/40 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
-            aria-label="Open chats"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        )}
-        <div className="relative h-9 w-9 shrink-0">
-          <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
-          <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
+      <header className="relative z-40 border-b border-border/60 bg-background/60 backdrop-blur-xl">
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-card/60 hover:text-foreground active:scale-95 md:hidden"
+              aria-label="Open chats"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          <div className="relative h-9 w-9 shrink-0 sm:h-10 sm:w-10">
+            <div className="absolute inset-[-5px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
+            <img src={logo} alt="" className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50" />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col leading-tight">
+            <h1 className="truncate font-display text-lg tracking-tight sm:text-xl">Elliot</h1>
+            <span className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
+              Woven from memory · forged in red
+            </span>
+          </div>
+          <ModelPicker tier={tier} onChange={setTier} />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h1 className="font-display text-xl tracking-tight">Elliot</h1>
-          <span className="truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Woven from memory · forged in red
-          </span>
-        </div>
-        <ModelPicker tier={tier} onChange={setTier} />
+        <div className="ember-hairline" />
       </header>
+
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">

@@ -578,16 +578,22 @@ function useElliotGreeting() {
 function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id: TierId; name: string; tagline: string } }) {
   const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
-    <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
-      <div className="relative mb-6 h-32 w-32">
+    <div className="mx-auto flex h-full w-full max-w-md flex-col items-center justify-center px-1 pt-6 text-center sm:pt-10">
+      <div className="relative mb-6 h-24 w-24 sm:h-32 sm:w-32 lg:h-40 lg:w-40">
         <div
           className="absolute inset-[-24px] rounded-full blur-3xl"
           style={{ background: "var(--gradient-glow)", animation: "elliot-halo 3s ease-in-out infinite" }}
         />
+        <div
+          className="absolute inset-[-10px] rounded-full border border-primary/25"
+          style={{ animation: "elliot-ring-spin 18s linear infinite" }}
+        >
+          <div className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-ember shadow-[0_0_8px_var(--primary-glow)]" />
+        </div>
         <img
           src={logo}
           alt="Elliot"
-          className="relative h-32 w-32 rounded-full object-cover ring-1 ring-primary/50"
+          className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50"
           style={{ animation: "elliot-breathe 3.6s ease-in-out infinite" }}
         />
       </div>
@@ -596,7 +602,7 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
           {monthBadge}
         </span>
       )}
-      <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
+      <h2 className="font-display text-3xl tracking-tight sm:text-4xl">{timeGreeting}.</h2>
       <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
       <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
         <span className="text-primary-glow">{tier.name.toUpperCase()}</span>
@@ -604,16 +610,18 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
         <span>{tier.tagline}</span>
       </p>
       <div className="mt-7 flex w-full flex-col gap-2">
-        {SUGGESTIONS.map((s) => (
+        {SUGGESTIONS.map((s, i) => (
           <button
             key={s}
             onClick={() => onPick(s)}
-            className="group rounded-xl border border-border bg-card/40 px-4 py-3 text-left text-sm text-foreground/90 backdrop-blur-md transition hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)]"
+            className="sheen-card group rounded-xl border border-border bg-card/40 px-4 py-3.5 text-left text-sm text-foreground/90 backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)] active:scale-[0.99]"
+            style={{ animation: `message-in 0.5s ease-out ${0.08 * i}s both` }}
           >
-            <span className="mr-2 text-primary">›</span>
+            <span className="mr-2 text-primary transition group-hover:translate-x-0.5">›</span>
             {s}
           </button>
         ))}
+
       </div>
     </div>
   );

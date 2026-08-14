@@ -382,7 +382,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       {/* Composer */}
       <form
         onSubmit={onSubmit}
-        className="relative border-t border-border/60 bg-background/50 px-4 py-4 backdrop-blur-xl"
+        className="safe-bottom relative border-t border-border/60 bg-background/50 px-3 pt-3 backdrop-blur-xl sm:px-4 sm:pt-4"
       >
         <input
           ref={fileInputRef}
@@ -414,7 +414,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           </div>
         )}
 
-        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30">
+        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition duration-300 focus-within:border-primary/60 focus-within:shadow-[var(--shadow-ember)] focus-within:ring-2 focus-within:ring-primary/30 lg:max-w-3xl">
           <textarea
             ref={textareaRef}
             value={input + (speech.listening && interimRef.current ? ` ${interimRef.current}` : "")}

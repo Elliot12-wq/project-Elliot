@@ -1,8 +1,7 @@
 @import "tailwindcss" source(none);
-@source "../src";
 @import "tw-animate-css";
+@source "../src";
 
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -206,3 +205,59 @@
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0.15 25 / 80%); }
+
+/* ---------- v2 polish ---------- */
+
+.safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+@keyframes ember-line {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.ember-hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, oklch(0.58 0.225 25 / 70%), oklch(0.72 0.22 30 / 90%), oklch(0.58 0.225 25 / 70%), transparent);
+  background-size: 200% 100%;
+  animation: ember-line 9s linear infinite;
+}
+
+@keyframes sheen {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+.sheen-card { position: relative; overflow: hidden; }
+.sheen-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent 20%, oklch(1 0 0 / 8%) 50%, transparent 80%);
+  pointer-events: none;
+}
+.sheen-card:hover::after { animation: sheen 0.9s ease-out; }
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop-in { animation: pop-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+@keyframes sheet-up {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-sheet-up { animation: sheet-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+textarea, input, select { font-size: 16px; }
+@media (min-width: 640px) {
+  textarea, input, select { font-size: 0.9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

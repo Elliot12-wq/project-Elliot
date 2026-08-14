@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+
 import ReactMarkdown from "react-markdown";
 import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
@@ -8,8 +10,8 @@ import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
-import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
-const logo = logoAsset.url;
+import logo from "@/assets/elliot-logo.png";
+
 
 type TierId = "1.0" | "1.2" | "2.2" | "2.3";
 const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
@@ -297,29 +299,33 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-2 border-b border-border/60 bg-background/40 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-card/60 hover:text-foreground md:hidden"
-            aria-label="Open chats"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        )}
-        <div className="relative h-9 w-9 shrink-0">
-          <div className="absolute inset-[-4px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
-          <img src={logo} alt="" className="relative h-9 w-9 rounded-full object-cover ring-1 ring-primary/50" />
+      <header className="relative z-40 border-b border-border/60 bg-background/60 backdrop-blur-xl">
+        <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-card/60 hover:text-foreground active:scale-95 md:hidden"
+              aria-label="Open chats"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
+          <div className="relative h-9 w-9 shrink-0 sm:h-10 sm:w-10">
+            <div className="absolute inset-[-5px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
+            <img src={logo} alt="" className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50" />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col leading-tight">
+            <h1 className="truncate font-display text-lg tracking-tight sm:text-xl">Elliot</h1>
+            <span className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
+              Woven from memory · forged in red
+            </span>
+          </div>
+          <ModelPicker tier={tier} onChange={setTier} />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col leading-tight">
-          <h1 className="font-display text-xl tracking-tight">Elliot</h1>
-          <span className="truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Woven from memory · forged in red
-          </span>
-        </div>
-        <ModelPicker tier={tier} onChange={setTier} />
+        <div className="ember-hairline" />
       </header>
+
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
@@ -376,7 +382,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       {/* Composer */}
       <form
         onSubmit={onSubmit}
-        className="relative border-t border-border/60 bg-background/50 px-4 py-4 backdrop-blur-xl"
+        className="safe-bottom relative border-t border-border/60 bg-background/50 px-3 pt-3 backdrop-blur-xl sm:px-4 sm:pt-4"
       >
         <input
           ref={fileInputRef}
@@ -408,7 +414,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           </div>
         )}
 
-        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30">
+        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition duration-300 focus-within:border-primary/60 focus-within:shadow-[var(--shadow-ember)] focus-within:ring-2 focus-within:ring-primary/30 lg:max-w-3xl">
           <textarea
             ref={textareaRef}
             value={input + (speech.listening && interimRef.current ? ` ${interimRef.current}` : "")}
@@ -572,16 +578,22 @@ function useElliotGreeting() {
 function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id: TierId; name: string; tagline: string } }) {
   const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
-    <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center pt-10 text-center">
-      <div className="relative mb-6 h-32 w-32">
+    <div className="mx-auto flex h-full w-full max-w-md flex-col items-center justify-center px-1 pt-6 text-center sm:pt-10">
+      <div className="relative mb-6 h-24 w-24 sm:h-32 sm:w-32 lg:h-40 lg:w-40">
         <div
           className="absolute inset-[-24px] rounded-full blur-3xl"
           style={{ background: "var(--gradient-glow)", animation: "elliot-halo 3s ease-in-out infinite" }}
         />
+        <div
+          className="absolute inset-[-10px] rounded-full border border-primary/25"
+          style={{ animation: "elliot-ring-spin 18s linear infinite" }}
+        >
+          <div className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-ember shadow-[0_0_8px_var(--primary-glow)]" />
+        </div>
         <img
           src={logo}
           alt="Elliot"
-          className="relative h-32 w-32 rounded-full object-cover ring-1 ring-primary/50"
+          className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50"
           style={{ animation: "elliot-breathe 3.6s ease-in-out infinite" }}
         />
       </div>
@@ -590,7 +602,7 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
           {monthBadge}
         </span>
       )}
-      <h2 className="font-display text-4xl tracking-tight">{timeGreeting}.</h2>
+      <h2 className="font-display text-3xl tracking-tight sm:text-4xl">{timeGreeting}.</h2>
       <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
       <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
         <span className="text-primary-glow">{tier.name.toUpperCase()}</span>
@@ -598,16 +610,18 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
         <span>{tier.tagline}</span>
       </p>
       <div className="mt-7 flex w-full flex-col gap-2">
-        {SUGGESTIONS.map((s) => (
+        {SUGGESTIONS.map((s, i) => (
           <button
             key={s}
             onClick={() => onPick(s)}
-            className="group rounded-xl border border-border bg-card/40 px-4 py-3 text-left text-sm text-foreground/90 backdrop-blur-md transition hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)]"
+            className="sheen-card group rounded-xl border border-border bg-card/40 px-4 py-3.5 text-left text-sm text-foreground/90 backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)] active:scale-[0.99]"
+            style={{ animation: `message-in 0.5s ease-out ${0.08 * i}s both` }}
           >
-            <span className="mr-2 text-primary">›</span>
+            <span className="mr-2 text-primary transition group-hover:translate-x-0.5">›</span>
             {s}
           </button>
         ))}
+
       </div>
     </div>
   );
@@ -616,54 +630,112 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
 
 function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  const place = () => {
+    const b = btnRef.current?.getBoundingClientRect();
+    if (b) setRect({ top: b.bottom + 8, right: window.innerWidth - b.right });
+  };
+
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    place();
+    const onDoc = (e: MouseEvent | TouchEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [open]);
+
+  const list = (
+    <div
+      ref={popRef}
+      role="listbox"
+      className={
+        isMobile
+          ? "animate-sheet-up fixed inset-x-3 bottom-3 z-[2000] overflow-hidden rounded-2xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl safe-bottom"
+          : "animate-pop-in fixed z-[2000] w-72 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl"
+      }
+      style={isMobile ? undefined : { top: rect?.top ?? 0, right: rect?.right ?? 12 }}
+    >
+      {isMobile && (
+        <div className="px-4 pb-1 pt-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Choose a model
+        </div>
+      )}
+      {TIERS.map((t, i) => (
+        <button
+          key={t.id}
+          role="option"
+          aria-selected={t.id === tier}
+          onClick={() => {
+            onChange(t.id);
+            setOpen(false);
+          }}
+          className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
+            t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+          }`}
+          style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-foreground">{t.name}</div>
+            <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
+          </div>
+          {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div className="shrink-0">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-full border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60"
+        className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-background/50 px-3 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60 active:scale-95"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         v{tier}
         <ChevronDown className={`h-3 w-3 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div
-          role="listbox"
-          className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[var(--shadow-deep)] backdrop-blur-xl"
-        >
-          {TIERS.map((t) => (
-            <button
-              key={t.id}
-              role="option"
-              aria-selected={t.id === tier}
-              onClick={() => {
-                onChange(t.id);
-                setOpen(false);
-              }}
-              className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-primary/10 ${
-                t.id === tier ? "bg-primary/5" : ""
-              }`}
-            >
-              <div className="flex-1">
-                <div className="text-sm font-medium text-foreground">{t.name}</div>
-                <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
-              </div>
-              {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <>
+              {isMobile && (
+                <div className="fixed inset-0 z-[1999] bg-background/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+              )}
+              {list}
+            </>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
+

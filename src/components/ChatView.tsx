@@ -8,8 +8,8 @@ import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
-import logoAsset from "@/assets/elliot-logo-pride.png.asset.json";
-const logo = logoAsset.url;
+import logo from "@/assets/elliot-logo.png";
+
 
 type TierId = "1.0" | "1.2" | "2.2" | "2.3";
 const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [

@@ -4,7 +4,7 @@ Elliot is now widely available across all users iOS and Android.
 >our goal is to make everything convenient and make life questions easier.
 >With the help of groq we are able to use it for our ai.
 >Elliot's core engine runs on groq.com
-~>Elliot's founder is Charlie Nathaniel, a high school student on where that every ai is money hungry
+~>Elliot's founder is a high school student on where that he hated school, because it limits his critical thinking ability, so he decided to make Elliot.
 >every ai limits their use against you
 >every ai only just consumes your money by premium features.
 >Elliot does the exact opposite.

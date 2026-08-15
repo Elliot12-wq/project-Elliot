@@ -90,7 +90,7 @@ export function ConversationSidebar({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-background/60 hover:text-foreground md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-background/60 hover:text-foreground active:scale-95 md:hidden"
             aria-label="Close chats"
           >
             <X className="h-4 w-4" />
@@ -100,7 +100,7 @@ export function ConversationSidebar({
 
       <button
         onClick={newChat}
-        className="mx-3 mb-3 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-ember)] transition active:scale-[0.99]"
+        className="mx-3 mb-3 flex min-h-[44px] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-ember)] transition duration-300 hover:brightness-110 active:scale-[0.98]"
         style={{ background: "var(--gradient-ember)" }}
       >
         <Plus className="h-4 w-4" /> New chat
@@ -137,7 +137,7 @@ export function ConversationSidebar({
                 onClose?.();
                 window.setTimeout(() => navigate({ to: "/c/$id", params: { id: c.id } }), 0);
               }}
-              className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition duration-200 ${
                 c.id === activeId
                   ? "bg-primary/15 text-foreground"
                   : "text-foreground/80 hover:bg-card/60"
@@ -161,16 +161,16 @@ export function ConversationSidebar({
         )}
       </nav>
 
-      <div className="m-3 flex flex-col gap-2">
+      <div className="safe-bottom m-3 flex flex-col gap-2">
         <button
           onClick={() => setInstrOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2 text-xs text-foreground/90 transition hover:border-primary/60 hover:bg-primary/10"
+          className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 min-h-[40px] py-2 text-xs text-foreground/90 transition hover:border-primary/60 hover:bg-primary/10"
         >
           <Sparkles className="h-3.5 w-3.5 text-primary-glow" /> Custom instructions
         </button>
         <button
           onClick={signOut}
-          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background/40 py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background/40 min-h-[40px] py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
         >
           <LogOut className="h-3.5 w-3.5" /> Sign out
         </button>

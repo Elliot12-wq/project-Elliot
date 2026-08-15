@@ -328,11 +328,12 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-5 sm:px-4 sm:py-6">
         {empty ? (
           <EmptyState onPick={send} tier={activeTier} />
         ) : (
-          <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          <div className="mx-auto flex max-w-2xl flex-col gap-4 lg:max-w-3xl">
+
             <AnimatePresence initial={false}>
               {messages.map((m) => (
                 <motion.div
@@ -504,7 +505,7 @@ function Bubble({ role, content, streaming }: { role: "user" | "assistant"; cont
     );
   }
   return (
-    <div className="group relative max-w-[90%] rounded-2xl rounded-bl-md border border-primary/20 bg-card/70 px-4 py-3 text-card-foreground backdrop-blur-md transition hover:border-primary/40 hover:shadow-[var(--shadow-ember)]">
+    <div className="group relative max-w-[92%] rounded-2xl rounded-bl-md border border-primary/20 bg-card/70 px-4 py-3 text-card-foreground shadow-[0_0_28px_-14px_var(--primary)] backdrop-blur-md transition duration-300 hover:border-primary/40 hover:shadow-[var(--shadow-ember)] sm:max-w-[85%]">
       <div className="prose-elliot">
         <ReactMarkdown
           components={{

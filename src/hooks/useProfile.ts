@@ -45,12 +45,12 @@ export function useProfile(enabled = true) {
     async (patch: { nickname?: string; avatarUrl?: string | null }) => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not signed in");
-      const row: Record<string, unknown> = {
+      const row = {
         user_id: u.user.id,
         updated_at: new Date().toISOString(),
+        ...(patch.nickname !== undefined ? { nickname: patch.nickname } : {}),
+        ...(patch.avatarUrl !== undefined ? { avatar_url: patch.avatarUrl } : {}),
       };
-      if (patch.nickname !== undefined) row.nickname = patch.nickname;
-      if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
       const { error } = await supabase.from("profiles").upsert(row, { onConflict: "user_id" });
       if (error) throw new Error(error.message);
       setProfile((p) => (p ? { ...p, ...("nickname" in patch ? { nickname: patch.nickname ?? "" } : {}), ...("avatarUrl" in patch ? { avatarUrl: patch.avatarUrl ?? null } : {}) } : p));

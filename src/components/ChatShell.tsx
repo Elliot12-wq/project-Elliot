@@ -19,11 +19,11 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
-      if (!data.session) navigate({ to: "/login", replace: true });
+      if (!data.session) navigate({ to: "/login", search: {}, replace: true });
       else setReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session) navigate({ to: "/login", replace: true });
+      if (!session) navigate({ to: "/login", search: {}, replace: true });
     });
     return () => {
       alive = false;

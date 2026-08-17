@@ -54,7 +54,7 @@ function IndexRedirect() {
         const t = setTimeout(() => {
           if (!done) {
             done = true;
-            navigate({ to: "/login", replace: true });
+            navigate({ to: "/login", search: {}, replace: true });
           }
         }, 1200);
         const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {

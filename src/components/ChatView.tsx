@@ -806,27 +806,55 @@ function ModelPicker({
           Choose a model
         </div>
       )}
-      {TIERS.map((t, i) => (
-        <button
-          key={t.id}
-          role="option"
-          aria-selected={t.id === tier}
-          onClick={() => {
-            onChange(t.id);
-            setOpen(false);
-          }}
-          className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
-            t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
-          }`}
-          style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
-        >
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground">{t.name}</div>
-            <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
-          </div>
-          {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
-        </button>
-      ))}
+      {TIERS.map((t, i) => {
+        const locked = !!guest && t.id !== "1.0";
+        return (
+          <button
+            key={t.id}
+            role="option"
+            aria-selected={t.id === tier}
+            onClick={() => {
+              onChange(t.id);
+              if (!locked) setOpen(false);
+            }}
+            onPointerDown={() => startPress(t.id)}
+            onPointerUp={endPress}
+            onPointerLeave={endPress}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setRevealed(t.id);
+            }}
+            className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
+              t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            } ${locked ? "opacity-70" : ""}`}
+            style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                {t.name}
+                {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {locked ? "Log in or create an account to use this" : t.tagline}
+              </div>
+              <AnimatePresence>
+                {revealed === t.id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-1 overflow-hidden text-[10px] uppercase tracking-[0.14em] text-primary-glow"
+                  >
+                    engine · {ENGINES[t.id]}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
+          </button>
+        );
+      })}
+
     </div>
   );
 

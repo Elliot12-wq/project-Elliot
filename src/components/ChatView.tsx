@@ -533,17 +533,23 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={streaming || pendingImages.length >= 4}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
-            aria-label="Attach image"
+            onClick={() => (guest ? guestLocked("Sending photos") : fileInputRef.current?.click())}
+            disabled={streaming || (!guest && pendingImages.length >= 4)}
+            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            aria-label={guest ? "Photos need an account" : "Attach image"}
           >
             <ImagePlus className="h-4 w-4" />
+            {guest && (
+              <Lock className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-background text-primary-glow" />
+            )}
           </button>
 
           <button
             type="button"
-            onClick={speech.listening ? speech.stop : speech.start}
+            onClick={() =>
+              guest ? guestLocked("Voice input") : speech.listening ? speech.stop() : speech.start()
+            }
+
             disabled={streaming}
             className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
               speech.listening

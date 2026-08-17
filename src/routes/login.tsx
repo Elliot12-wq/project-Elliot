@@ -52,13 +52,19 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account.");
+        if (data.session) {
+          toast.success("Welcome to Elliot.");
+        } else {
+          // Fall back to signing in directly (confirmation is auto-approved).
+          const { error: siErr } = await supabase.auth.signInWithPassword({ email, password });
+          if (siErr) throw siErr;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;

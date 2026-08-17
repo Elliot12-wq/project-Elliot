@@ -727,12 +727,32 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
 }
 
 
-function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) => void }) {
+function ModelPicker({
+  tier,
+  onChange,
+  guest,
+}: {
+  tier: TierId;
+  onChange: (id: TierId) => void;
+  guest?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [revealed, setRevealed] = useState<TierId | null>(null);
+  const pressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startPress = (id: TierId) => {
+    pressRef.current = setTimeout(() => setRevealed(id), 450);
+  };
+  const endPress = () => {
+    if (pressRef.current) clearTimeout(pressRef.current);
+    pressRef.current = null;
+  };
+
+
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");

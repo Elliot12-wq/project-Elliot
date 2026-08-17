@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -6,8 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import logo from "@/assets/elliot-logo.png";
 import { Toaster } from "@/components/ui/sonner";
+import { rememberAccount } from "@/lib/accounts";
+import { enterGuest, leaveGuest } from "@/lib/guest";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    email: typeof search.email === "string" ? search.email : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Sign in — Elliot" }],
   }),
@@ -16,20 +21,30 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { email: prefill } = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefill ?? "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/", replace: true });
+      if (data.session) {
+        rememberAccount(data.session.user.email);
+        leaveGuest();
+        navigate({ to: "/", replace: true });
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) navigate({ to: "/", replace: true });
+      if (session) {
+        rememberAccount(session.user.email);
+        leaveGuest();
+        navigate({ to: "/", replace: true });
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
+
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

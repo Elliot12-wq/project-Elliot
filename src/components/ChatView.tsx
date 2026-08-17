@@ -559,10 +559,14 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
             aria-label={speech.listening ? "Stop voice input" : "Voice input"}
           >
             {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {guest && (
+              <Lock className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-background text-primary-glow" />
+            )}
             {speech.listening && (
               <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
             )}
           </button>
+
 
           <button
             type={streaming ? "button" : "submit"}

@@ -162,6 +162,22 @@ function LoginPage() {
             <GoogleIcon /> Continue with Google
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              enterGuest();
+              navigate({ to: "/guest" });
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-3 text-sm text-foreground/90 transition hover:border-primary/50 hover:bg-primary/10"
+          >
+            Continue as a guest
+          </button>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground/70">
+            Guests chat with Elliot 1.0 only — photos, voice and memory need an account.
+          </p>
+
+
+
           <p className="mt-5 text-center text-xs text-muted-foreground">
             {mode === "signin" ? "New to Elliot?" : "Already have an account?"}{" "}
             <button

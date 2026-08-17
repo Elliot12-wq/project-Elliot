@@ -383,7 +383,7 @@ function SwitchPane() {
   async function goTo(email?: string) {
     await supabase.auth.signOut();
     leaveGuest();
-    navigate({ to: "/login", search: email ? { email } : undefined });
+    navigate({ to: "/login", search: email ? { email } : {} });
   }
 
   return (

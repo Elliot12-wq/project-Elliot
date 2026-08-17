@@ -78,17 +78,35 @@ export function ChatShell({
   }
 
   const mobileOverlay =
-    mobileOpen && typeof document !== "undefined"
+    typeof document !== "undefined"
       ? createPortal(
-          <div className="md:hidden">
-            <div
-              className="fixed inset-0 z-[1000] bg-background/70 backdrop-blur-sm"
-              onClick={() => setMobileOpen(false)}
-            />
-            <div className="fixed inset-y-0 left-0 z-[1001]">
-              <ConversationSidebar activeId={activeId} onClose={() => setMobileOpen(false)} />
-            </div>
-          </div>,
+          <AnimatePresence>
+            {mobileOpen && (
+              <div className="md:hidden">
+                <motion.div
+                  initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                  animate={{ opacity: 1, backdropFilter: "blur(10px)" }}
+                  exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                  transition={{ duration: 0.26, ease: "easeOut" }}
+                  className="fixed inset-0 z-[1000] bg-background/70"
+                  onClick={() => setMobileOpen(false)}
+                />
+                <motion.div
+                  initial={{ x: "-100%", filter: "blur(6px)" }}
+                  animate={{ x: 0, filter: "blur(0px)" }}
+                  exit={{ x: "-100%", filter: "blur(6px)" }}
+                  transition={{ type: "spring", stiffness: 320, damping: 34 }}
+                  className="fixed inset-y-0 left-0 z-[1001]"
+                >
+                  <ConversationSidebar
+                    activeId={activeId}
+                    guest={guest}
+                    onClose={() => setMobileOpen(false)}
+                  />
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
           document.body,
         )
       : null;
@@ -100,8 +118,9 @@ export function ChatShell({
         <AmbientBackground />
 
         <div className="hidden md:flex">
-          <ConversationSidebar activeId={activeId} />
+          <ConversationSidebar activeId={activeId} guest={guest} />
         </div>
+
 
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </div>

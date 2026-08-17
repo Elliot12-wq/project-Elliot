@@ -330,7 +330,8 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
       const { data } = await supabase
         .from("messages")
         .select("id,role,content,created_at")
-        .eq("conversation_id", conversationId)
+        .eq("conversation_id", conversationId!)
+
         .order("created_at", { ascending: true });
       if (data) setMessages((prev) => mergeMessages(prev, data as Msg[]));
       setStreamingText("");

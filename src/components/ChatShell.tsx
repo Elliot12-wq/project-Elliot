@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
+import { useGlassBootstrap } from "@/lib/appearance";
+
 import { supabase } from "@/integrations/supabase/client";
 import { ConversationSidebar } from "@/components/ConversationSidebar";
 import { AmbientBackground } from "@/components/AmbientBackground";

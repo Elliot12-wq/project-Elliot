@@ -50,8 +50,9 @@ const SUGGESTIONS = [
   "Brainstorm a startup name with me.",
 ];
 
-export function ChatView({ conversationId }: { conversationId: string }) {
+export function ChatView({ conversationId, guest }: { conversationId?: string; guest?: boolean }) {
   const shell = useShell();
+  const navigate = useNavigate();
   const onToggleSidebar = shell?.openSidebar;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -63,11 +64,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const interimRef = useRef("");
 
   const [tier, setTierState] = useState<TierId>(() => {
+    if (guest) return "1.0";
     if (typeof window === "undefined") return DEFAULT_TIER;
     const raw = window.localStorage.getItem(STORAGE_KEY) as TierId | null;
     return raw && TIERS.some((t) => t.id === raw) ? raw : DEFAULT_TIER;
   });
   const setTier = (id: TierId) => {
+    if (guest && id !== "1.0") {
+      toast.error("Elliot 1.0 is the guest engine. Log in to unlock the others.");
+      return;
+    }
     setTierState(id);
     try {
       window.localStorage.setItem(STORAGE_KEY, id);
@@ -75,8 +81,27 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   };
   const activeTier = TIERS.find((t) => t.id === tier) ?? TIERS[1];
 
+  function guestLocked(what: string) {
+    toast.error(`${what} needs an account. Log in to unlock it.`, {
+      action: { label: "Log in", onClick: () => { leaveGuest(); navigate({ to: "/login", search: {} }); } },
+    });
+  }
+
+  // Guest: local-only history, reset on request
+  useEffect(() => {
+    if (!guest) return;
+    setMessages(loadGuestMessages() as Msg[]);
+    const onNew = () => {
+      setMessages([]);
+      saveGuestMessages([]);
+    };
+    window.addEventListener("elliot:guest-new-chat", onNew);
+    return () => window.removeEventListener("elliot:guest-new-chat", onNew);
+  }, [guest]);
+
   // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
+    if (guest || !conversationId) return;
     let alive = true;
     setStreamingText("");
     supabase
@@ -115,7 +140,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       abortRef.current?.abort();
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, guest]);
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

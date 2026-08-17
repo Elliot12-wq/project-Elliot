@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as GuestRouteImport } from './routes/guest'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CIdRouteImport } from './routes/c.$id'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -18,6 +19,11 @@ import { Route as ApiPublicGuestChatRouteImport } from './routes/api/public/gues
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuestRoute = GuestRouteImport.update({
+  id: '/guest',
+  path: '/guest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +49,7 @@ const ApiPublicGuestChatRoute = ApiPublicGuestChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
@@ -65,12 +74,25 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/chat' | '/c/$id' | '/api/public/guest-chat'
+  fullPaths:
+    | '/'
+    | '/guest'
+    | '/login'
+    | '/api/chat'
+    | '/c/$id'
+    | '/api/public/guest-chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/chat' | '/c/$id' | '/api/public/guest-chat'
+  to:
+    | '/'
+    | '/guest'
+    | '/login'
+    | '/api/chat'
+    | '/c/$id'
+    | '/api/public/guest-chat'
   id:
     | '__root__'
     | '/'
+    | '/guest'
     | '/login'
     | '/api/chat'
     | '/c/$id'
@@ -79,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GuestRoute: typeof GuestRoute
   LoginRoute: typeof LoginRoute
   ApiChatRoute: typeof ApiChatRoute
   CIdRoute: typeof CIdRoute
@@ -92,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guest': {
+      id: '/guest'
+      path: '/guest'
+      fullPath: '/guest'
+      preLoaderRoute: typeof GuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -127,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GuestRoute: GuestRoute,
   LoginRoute: LoginRoute,
   ApiChatRoute: ApiChatRoute,
   CIdRoute: CIdRoute,

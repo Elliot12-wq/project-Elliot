@@ -10,12 +10,25 @@ import logo from "@/assets/elliot-logo.png";
 const ShellCtx = createContext<{ openSidebar: () => void } | null>(null);
 export const useShell = () => useContext(ShellCtx);
 
-export function ChatShell({ activeId, children }: { activeId?: string; children: ReactNode }) {
+export function ChatShell({
+  activeId,
+  guest,
+  children,
+}: {
+  activeId?: string;
+  guest?: boolean;
+  children: ReactNode;
+}) {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  useGlassBootstrap();
 
   useEffect(() => {
+    if (guest) {
+      setReady(true);
+      return;
+    }
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return;
@@ -29,7 +42,8 @@ export function ChatShell({ activeId, children }: { activeId?: string; children:
       alive = false;
       sub.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, guest]);
+
 
   // Body scroll lock while mobile sidebar is open
   useEffect(() => {

@@ -206,6 +206,57 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
     return urls;
   }
 
+  async function sendGuest(content: string) {
+    const tempUserId = `g-u-${Date.now()}`;
+    const history: GuestMsg[] = [
+      ...(messages as GuestMsg[]),
+      { id: tempUserId, role: "user", content },
+    ];
+    setMessages(history as Msg[]);
+    saveGuestMessages(history);
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    try {
+      const res = await fetch("/api/public/guest-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history.map((m) => ({ role: m.role, content: m.content })) }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) {
+        let msg = `Couldn't reach Elliot (HTTP ${res.status}).`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setStreamingText(acc);
+      }
+      if (acc.trim()) {
+        const next: GuestMsg[] = [...history, { id: `g-a-${Date.now()}`, role: "assistant", content: acc }];
+        setMessages(next as Msg[]);
+        saveGuestMessages(next);
+      }
+      setStreamingText("");
+    } catch (err: any) {
+      if (err?.name !== "AbortError") toast.error(err?.message || "Couldn't reach Elliot.");
+      const rolled = history.filter((m) => m.id !== tempUserId);
+      setMessages(rolled as Msg[]);
+      saveGuestMessages(rolled);
+    } finally {
+      abortRef.current = null;
+    }
+  }
+
   async function send(text: string) {
     const content = text.trim();
     const imagesToSend = pendingImages;
@@ -217,7 +268,14 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
     setStreaming(true);
     setStreamingText("");
 
+    if (guest) {
+      await sendGuest(content);
+      setStreaming(false);
+      return;
+    }
+
     try {
+
       const { data: u, error: userError } = await supabase.auth.getUser();
       if (userError || !u.user) throw new Error("Session expired. Sign in again.");
       const { data: s } = await supabase.auth.getSession();

@@ -10,7 +10,10 @@ import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
+import { useNavigate } from "@tanstack/react-router";
+import { leaveGuest, loadGuestMessages, saveGuestMessages, type GuestMsg } from "@/lib/guest";
 import logo from "@/assets/elliot-logo.png";
+
 
 
 type TierId = "1.0" | "1.2" | "2.2" | "2.3";

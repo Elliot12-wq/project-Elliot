@@ -49,7 +49,11 @@ function IndexRedirect() {
       const { data: s } = await supabase.auth.getSession();
       if (s.session) {
         go(s.session.user.id);
+      } else if (isGuest()) {
+        done = true;
+        navigate({ to: "/guest", replace: true });
       } else {
+
         // Wait briefly for auth to hydrate; fall back to /login
         const t = setTimeout(() => {
           if (!done) {

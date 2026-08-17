@@ -261,3 +261,25 @@ textarea, input, select { font-size: 16px; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Liquid glass ---------- */
+
+.liquid-glass .glass-surface,
+.liquid-glass header,
+.liquid-glass .prose-elliot {
+  --glass-tint: oklch(1 0 0 / 6%);
+}
+
+.liquid-glass .glass-surface {
+  background: linear-gradient(160deg, oklch(1 0 0 / 8%), oklch(1 0 0 / 2%));
+  backdrop-filter: blur(28px) saturate(160%);
+  border-right-color: oklch(1 0 0 / 14%);
+  box-shadow: inset 1px 0 0 oklch(1 0 0 / 8%);
+}
+
+/* Android GPUs choke on heavy blur — lighter, cheaper variant. */
+.glass-lite .glass-surface {
+  backdrop-filter: blur(14px) saturate(130%);
+  background: oklch(0.2 0.02 260 / 72%);
+  box-shadow: none;
+}

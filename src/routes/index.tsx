@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AmbientBackground } from "@/components/AmbientBackground";
+import { isGuest } from "@/lib/guest";
 import logo from "@/assets/elliot-logo.png";
 
 export const Route = createFileRoute("/")({

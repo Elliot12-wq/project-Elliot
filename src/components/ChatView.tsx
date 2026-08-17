@@ -405,14 +405,24 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
           </div>
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <h1 className="truncate font-display text-lg tracking-tight sm:text-xl">Elliot</h1>
-            <span className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-              Woven from memory · forged in red
-            </span>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={tier}
+                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+                transition={{ duration: 0.22 }}
+                className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block"
+              >
+                <span className="text-primary-glow">{activeTier.name}</span> · {activeTier.tagline}
+              </motion.span>
+            </AnimatePresence>
           </div>
-          <ModelPicker tier={tier} onChange={setTier} />
+          <ModelPicker tier={tier} onChange={setTier} guest={guest} />
         </div>
         <div className="ember-hairline" />
       </header>
+
 
 
       {/* Messages */}

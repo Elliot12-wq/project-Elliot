@@ -10,9 +10,9 @@ import { rememberAccount } from "@/lib/accounts";
 import { enterGuest, leaveGuest } from "@/lib/guest";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    email: typeof search.email === "string" ? search.email : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { email?: string } =>
+    typeof search.email === "string" ? { email: search.email } : {},
+
   head: () => ({
     meta: [{ title: "Sign in — Elliot" }],
   }),

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -6,8 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import logo from "@/assets/elliot-logo.png";
 import { Toaster } from "@/components/ui/sonner";
+import { rememberAccount } from "@/lib/accounts";
+import { enterGuest, leaveGuest } from "@/lib/guest";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): { email?: string } =>
+    typeof search.email === "string" ? { email: search.email } : {},
+
   head: () => ({
     meta: [{ title: "Sign in — Elliot" }],
   }),
@@ -16,20 +21,30 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { email: prefill } = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefill ?? "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/", replace: true });
+      if (data.session) {
+        rememberAccount(data.session.user.email);
+        leaveGuest();
+        navigate({ to: "/", replace: true });
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) navigate({ to: "/", replace: true });
+      if (session) {
+        rememberAccount(session.user.email);
+        leaveGuest();
+        navigate({ to: "/", replace: true });
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
+
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -146,6 +161,22 @@ function LoginPage() {
           >
             <GoogleIcon /> Continue with Google
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              enterGuest();
+              navigate({ to: "/guest" });
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-3 text-sm text-foreground/90 transition hover:border-primary/50 hover:bg-primary/10"
+          >
+            Continue as a guest
+          </button>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground/70">
+            Guests chat with Elliot 1.0 only — photos, voice and memory need an account.
+          </p>
+
+
 
           <p className="mt-5 text-center text-xs text-muted-foreground">
             {mode === "signin" ? "New to Elliot?" : "Already have an account?"}{" "}

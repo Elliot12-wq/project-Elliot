@@ -3,14 +3,17 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 import ReactMarkdown from "react-markdown";
-import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X, ChevronDown } from "lucide-react";
+import { Send, Square, Mic, MicOff, Copy, Check, RotateCw, Menu, ImagePlus, X, ChevronDown, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ElliotThinking } from "@/components/ElliotThinking";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useShell } from "@/components/ChatShell";
+import { useNavigate } from "@tanstack/react-router";
+import { leaveGuest, loadGuestMessages, saveGuestMessages, type GuestMsg } from "@/lib/guest";
 import logo from "@/assets/elliot-logo.png";
+
 
 
 type TierId = "1.0" | "1.2" | "2.2" | "2.3";
@@ -20,6 +23,12 @@ const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
   { id: "2.2", name: "Elliot 2.2", tagline: "Most accurate — careful, precise" },
   { id: "2.3", name: "Elliot 2.3", tagline: "Best reasoning — deep, multi-step" },
 ];
+const ENGINES: Record<TierId, string> = {
+  "1.0": "Gemini 2.5 Flash Lite",
+  "1.2": "Gemini 2.5 Flash",
+  "2.2": "Gemini 2.5 Pro",
+  "2.3": "Gemini 2.5 Pro (deep)",
+};
 const DEFAULT_TIER: TierId = "1.2";
 const STORAGE_KEY = "elliot.tier";
 
@@ -50,8 +59,9 @@ const SUGGESTIONS = [
   "Brainstorm a startup name with me.",
 ];
 
-export function ChatView({ conversationId }: { conversationId: string }) {
+export function ChatView({ conversationId, guest }: { conversationId?: string; guest?: boolean }) {
   const shell = useShell();
+  const navigate = useNavigate();
   const onToggleSidebar = shell?.openSidebar;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -63,11 +73,16 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   const interimRef = useRef("");
 
   const [tier, setTierState] = useState<TierId>(() => {
+    if (guest) return "1.0";
     if (typeof window === "undefined") return DEFAULT_TIER;
     const raw = window.localStorage.getItem(STORAGE_KEY) as TierId | null;
     return raw && TIERS.some((t) => t.id === raw) ? raw : DEFAULT_TIER;
   });
   const setTier = (id: TierId) => {
+    if (guest && id !== "1.0") {
+      toast.error("Elliot 1.0 is the guest engine. Log in to unlock the others.");
+      return;
+    }
     setTierState(id);
     try {
       window.localStorage.setItem(STORAGE_KEY, id);
@@ -75,8 +90,27 @@ export function ChatView({ conversationId }: { conversationId: string }) {
   };
   const activeTier = TIERS.find((t) => t.id === tier) ?? TIERS[1];
 
+  function guestLocked(what: string) {
+    toast.error(`${what} needs an account. Log in to unlock it.`, {
+      action: { label: "Log in", onClick: () => { leaveGuest(); navigate({ to: "/login", search: {} }); } },
+    });
+  }
+
+  // Guest: local-only history, reset on request
+  useEffect(() => {
+    if (!guest) return;
+    setMessages(loadGuestMessages() as Msg[]);
+    const onNew = () => {
+      setMessages([]);
+      saveGuestMessages([]);
+    };
+    window.addEventListener("elliot:guest-new-chat", onNew);
+    return () => window.removeEventListener("elliot:guest-new-chat", onNew);
+  }, [guest]);
+
   // Load history — don't wipe immediately, swap on resolve
   useEffect(() => {
+    if (guest || !conversationId) return;
     let alive = true;
     setStreamingText("");
     supabase
@@ -115,7 +149,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       abortRef.current?.abort();
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, guest]);
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -177,6 +212,57 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     return urls;
   }
 
+  async function sendGuest(content: string) {
+    const tempUserId = `g-u-${Date.now()}`;
+    const history: GuestMsg[] = [
+      ...(messages as GuestMsg[]),
+      { id: tempUserId, role: "user", content },
+    ];
+    setMessages(history as Msg[]);
+    saveGuestMessages(history);
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    try {
+      const res = await fetch("/api/public/guest-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history.map((m) => ({ role: m.role, content: m.content })) }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) {
+        let msg = `Couldn't reach Elliot (HTTP ${res.status}).`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setStreamingText(acc);
+      }
+      if (acc.trim()) {
+        const next: GuestMsg[] = [...history, { id: `g-a-${Date.now()}`, role: "assistant", content: acc }];
+        setMessages(next as Msg[]);
+        saveGuestMessages(next);
+      }
+      setStreamingText("");
+    } catch (err: any) {
+      if (err?.name !== "AbortError") toast.error(err?.message || "Couldn't reach Elliot.");
+      const rolled = history.filter((m) => m.id !== tempUserId);
+      setMessages(rolled as Msg[]);
+      saveGuestMessages(rolled);
+    } finally {
+      abortRef.current = null;
+    }
+  }
+
   async function send(text: string) {
     const content = text.trim();
     const imagesToSend = pendingImages;
@@ -188,7 +274,14 @@ export function ChatView({ conversationId }: { conversationId: string }) {
     setStreaming(true);
     setStreamingText("");
 
+    if (guest) {
+      await sendGuest(content);
+      setStreaming(false);
+      return;
+    }
+
     try {
+
       const { data: u, error: userError } = await supabase.auth.getUser();
       if (userError || !u.user) throw new Error("Session expired. Sign in again.");
       const { data: s } = await supabase.auth.getSession();
@@ -243,7 +336,8 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       const { data } = await supabase
         .from("messages")
         .select("id,role,content,created_at")
-        .eq("conversation_id", conversationId)
+        .eq("conversation_id", conversationId!)
+
         .order("created_at", { ascending: true });
       if (data) setMessages((prev) => mergeMessages(prev, data as Msg[]));
       setStreamingText("");
@@ -317,14 +411,24 @@ export function ChatView({ conversationId }: { conversationId: string }) {
           </div>
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <h1 className="truncate font-display text-lg tracking-tight sm:text-xl">Elliot</h1>
-            <span className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-              Woven from memory · forged in red
-            </span>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={tier}
+                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+                transition={{ duration: 0.22 }}
+                className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block"
+              >
+                <span className="text-primary-glow">{activeTier.name}</span> · {activeTier.tagline}
+              </motion.span>
+            </AnimatePresence>
           </div>
-          <ModelPicker tier={tier} onChange={setTier} />
+          <ModelPicker tier={tier} onChange={setTier} guest={guest} />
         </div>
         <div className="ember-hairline" />
       </header>
+
 
 
       {/* Messages */}
@@ -429,17 +533,23 @@ export function ChatView({ conversationId }: { conversationId: string }) {
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={streaming || pendingImages.length >= 4}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
-            aria-label="Attach image"
+            onClick={() => (guest ? guestLocked("Sending photos") : fileInputRef.current?.click())}
+            disabled={streaming || (!guest && pendingImages.length >= 4)}
+            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            aria-label={guest ? "Photos need an account" : "Attach image"}
           >
             <ImagePlus className="h-4 w-4" />
+            {guest && (
+              <Lock className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-background text-primary-glow" />
+            )}
           </button>
 
           <button
             type="button"
-            onClick={speech.listening ? speech.stop : speech.start}
+            onClick={() =>
+              guest ? guestLocked("Voice input") : speech.listening ? speech.stop() : speech.start()
+            }
+
             disabled={streaming}
             className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
               speech.listening
@@ -449,10 +559,14 @@ export function ChatView({ conversationId }: { conversationId: string }) {
             aria-label={speech.listening ? "Stop voice input" : "Voice input"}
           >
             {speech.listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {guest && (
+              <Lock className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-background text-primary-glow" />
+            )}
             {speech.listening && (
               <span className="absolute -inset-0.5 rounded-xl border border-primary/40" style={{ animation: "elliot-halo 1.4s ease-in-out infinite" }} />
             )}
           </button>
+
 
           <button
             type={streaming ? "button" : "submit"}
@@ -629,12 +743,32 @@ function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id:
 }
 
 
-function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) => void }) {
+function ModelPicker({
+  tier,
+  onChange,
+  guest,
+}: {
+  tier: TierId;
+  onChange: (id: TierId) => void;
+  guest?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [revealed, setRevealed] = useState<TierId | null>(null);
+  const pressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startPress = (id: TierId) => {
+    pressRef.current = setTimeout(() => setRevealed(id), 450);
+  };
+  const endPress = () => {
+    if (pressRef.current) clearTimeout(pressRef.current);
+    pressRef.current = null;
+  };
+
+
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -688,27 +822,55 @@ function ModelPicker({ tier, onChange }: { tier: TierId; onChange: (id: TierId) 
           Choose a model
         </div>
       )}
-      {TIERS.map((t, i) => (
-        <button
-          key={t.id}
-          role="option"
-          aria-selected={t.id === tier}
-          onClick={() => {
-            onChange(t.id);
-            setOpen(false);
-          }}
-          className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
-            t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
-          }`}
-          style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
-        >
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground">{t.name}</div>
-            <div className="text-[11px] text-muted-foreground">{t.tagline}</div>
-          </div>
-          {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
-        </button>
-      ))}
+      {TIERS.map((t, i) => {
+        const locked = !!guest && t.id !== "1.0";
+        return (
+          <button
+            key={t.id}
+            role="option"
+            aria-selected={t.id === tier}
+            onClick={() => {
+              onChange(t.id);
+              if (!locked) setOpen(false);
+            }}
+            onPointerDown={() => startPress(t.id)}
+            onPointerUp={endPress}
+            onPointerLeave={endPress}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setRevealed(t.id);
+            }}
+            className={`flex w-full items-start gap-2 px-4 py-3 text-left transition hover:bg-primary/10 active:bg-primary/15 sm:px-3 sm:py-2.5 ${
+              t.id === tier ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            } ${locked ? "opacity-70" : ""}`}
+            style={{ animation: `pop-in 0.22s cubic-bezier(0.2,0.9,0.3,1.2) ${i * 0.03}s both` }}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                {t.name}
+                {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {locked ? "Log in or create an account to use this" : t.tagline}
+              </div>
+              <AnimatePresence>
+                {revealed === t.id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-1 overflow-hidden text-[10px] uppercase tracking-[0.14em] text-primary-glow"
+                  >
+                    engine · {ENGINES[t.id]}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            {t.id === tier && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-primary-glow" />}
+          </button>
+        );
+      })}
+
     </div>
   );
 

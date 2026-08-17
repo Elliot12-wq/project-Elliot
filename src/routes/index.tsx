@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AmbientBackground } from "@/components/AmbientBackground";
+import { isGuest } from "@/lib/guest";
 import logo from "@/assets/elliot-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -49,12 +50,16 @@ function IndexRedirect() {
       const { data: s } = await supabase.auth.getSession();
       if (s.session) {
         go(s.session.user.id);
+      } else if (isGuest()) {
+        done = true;
+        navigate({ to: "/guest", replace: true });
       } else {
+
         // Wait briefly for auth to hydrate; fall back to /login
         const t = setTimeout(() => {
           if (!done) {
             done = true;
-            navigate({ to: "/login", replace: true });
+            navigate({ to: "/login", search: {}, replace: true });
           }
         }, 1200);
         const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {

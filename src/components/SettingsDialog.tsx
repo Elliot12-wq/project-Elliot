@@ -188,7 +188,7 @@ function GuestNotice({ what }: { what: string }) {
       <button
         onClick={() => {
           leaveGuest();
-          navigate({ to: "/login" });
+          navigate({ to: "/login", search: {} });
         }}
         className="mt-3 rounded-lg px-4 py-2 text-sm font-medium text-primary-foreground shadow-[var(--shadow-ember)]"
         style={{ background: "var(--gradient-ember)" }}
@@ -361,7 +361,7 @@ function AccountPane({ guest, onSwitch }: { guest?: boolean; onSwitch: () => voi
         <button
           onClick={async () => {
             await supabase.auth.signOut();
-            navigate({ to: "/login" });
+            navigate({ to: "/login", search: {} });
           }}
           className="flex w-full items-center gap-2 rounded-xl border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground transition hover:border-destructive/50 hover:text-foreground"
         >
@@ -383,7 +383,7 @@ function SwitchPane() {
   async function goTo(email?: string) {
     await supabase.auth.signOut();
     leaveGuest();
-    navigate({ to: "/login", search: email ? { email } : undefined });
+    navigate({ to: "/login", search: email ? { email } : {} });
   }
 
   return (

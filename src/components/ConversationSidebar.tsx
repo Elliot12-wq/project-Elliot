@@ -120,7 +120,7 @@ export function ConversationSidebar({
           <button
             onClick={() => {
               leaveGuest();
-              navigate({ to: "/login" });
+              navigate({ to: "/login", search: {} });
             }}
             className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-2 text-xs text-foreground transition hover:bg-primary/20"
           >

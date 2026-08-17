@@ -132,9 +132,19 @@ export const Route = createFileRoute("/api/chat")({
           ? `\n\nUSER'S CUSTOM INSTRUCTIONS (follow these unless they conflict with safety):\n${instructions}`
           : "";
 
+        // Nickname / persona the user chose in Settings.
+        const { data: profileRow } = await supabaseAdmin
+          .from("profiles")
+          .select("nickname")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const nickname = String(profileRow?.nickname ?? "").trim();
+        const nicknameBlock = nickname ? `\n\nThe user prefers to be called "${nickname}". Use it naturally.` : "";
+
         const SYSTEM = `You are Elliot, a thoughtful, creative, warmly confident AI assistant.
 Calm, intelligent, a little poetic — never robotic. Use markdown when it helps (lists, code, emphasis).
-You simply identify as Elliot.${instructionsBlock}${memoryBlock}`;
+You simply identify as Elliot.${nicknameBlock}${instructionsBlock}${memoryBlock}`;
+
 
         const aiKey = process.env.LOVABLE_API_KEY;
         if (!aiKey) {

@@ -1,8 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-const AI_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-// Guests are hard-locked to the Elliot 1.0 engine. No other tier is reachable here.
-const GUEST_MODEL = "google/gemini-2.5-flash-lite";
+import { getAiConfig, aiFetch, streamDeltas } from "@/lib/ai.server";
 
 const jsonError = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {
@@ -63,8 +60,9 @@ export const Route = createFileRoute("/api/public/guest-chat")({
           return jsonError(400, "Missing message.");
         }
 
-        const aiKey = process.env.LOVABLE_API_KEY;
-        if (!aiKey) return jsonError(500, "AI is not configured yet.");
+        // Guests are hard-locked to the Elliot 1.0 engine.
+        const ai = getAiConfig("1.0");
+        if (!ai) return jsonError(500, "AI is not configured on this deployment.");
 
         const SYSTEM = `You are Elliot, a thoughtful, creative, warmly confident AI assistant.
 Calm, intelligent, a little poetic — never robotic. Use markdown when it helps.
@@ -74,15 +72,11 @@ You simply identify as Elliot.`;
 
         let aiRes: Response;
         try {
-          aiRes = await fetch(AI_CHAT_URL, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: GUEST_MODEL,
-              temperature: 0.7,
-              stream: true,
-              messages: [{ role: "system", content: SYSTEM }, ...messages],
-            }),
+          aiRes = await aiFetch(ai, {
+            model: ai.chatModel,
+            temperature: 0.7,
+            stream: true,
+            messages: [{ role: "system", content: SYSTEM }, ...messages],
           });
         } catch (e) {
           console.error("guest AI fetch failed", e);
@@ -91,40 +85,19 @@ You simply identify as Elliot.`;
 
         if (!aiRes.ok || !aiRes.body) {
           const text = await aiRes.text().catch(() => "");
-          console.error("guest AI gateway error", aiRes.status, text);
+          console.error("guest AI error", ai.provider, aiRes.status, text);
+          if (aiRes.status === 401 || aiRes.status === 403)
+            return jsonError(502, "Elliot's AI key was rejected. Check the deployment's API key.");
           if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again shortly.");
           if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted.");
           return jsonError(502, `Elliot couldn't start a response (upstream ${aiRes.status}).`);
         }
 
         const encoder = new TextEncoder();
-        const decoder = new TextDecoder();
-
         const stream = new ReadableStream({
           async start(controller) {
-            const reader = aiRes.body!.getReader();
-            let buffer = "";
             try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop() ?? "";
-                for (const line of lines) {
-                  const trimmed = line.trim();
-                  if (!trimmed.startsWith("data:")) continue;
-                  const payload = trimmed.slice(5).trim();
-                  if (payload === "[DONE]") continue;
-                  try {
-                    const json = JSON.parse(payload);
-                    const delta = json.choices?.[0]?.delta?.content;
-                    if (delta) controller.enqueue(encoder.encode(delta));
-                  } catch {
-                    /* ignore */
-                  }
-                }
-              }
+              await streamDeltas(aiRes.body!, (delta) => controller.enqueue(encoder.encode(delta)));
             } catch (e) {
               console.error("guest stream error", e);
             } finally {

@@ -46,6 +46,15 @@ function LoginPage() {
   }, [navigate]);
 
 
+  function friendlyAuthError(message: string): string {
+    const m = message.toLowerCase();
+    if (m.includes("invalid login credentials")) return "Wrong email or password.";
+    if (m.includes("password") && m.includes("6")) return "Password must be at least 6 characters.";
+    if (m.includes("invalid") && m.includes("email")) return "That email address doesn't look valid.";
+    if (m.includes("rate") || m.includes("too many")) return "Too many attempts — wait a moment and try again.";
+    return message;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (loading) return;
@@ -53,28 +62,51 @@ function LoginPage() {
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
           options: { emailRedirectTo: window.location.origin },
         });
-        if (error) throw error;
+
+        if (error) {
+          const already = /already registered|already exists|user already/i.test(error.message);
+          if (!already) throw error;
+
+          // The address exists: try signing them straight in with what they typed.
+          const { error: siErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (!siErr) return;
+
+          if (/invalid login credentials/i.test(siErr.message)) {
+            setMode("signin");
+            toast.error("This email already has an account. Sign in, or use Continue with Google.");
+            return;
+          }
+          throw siErr;
+        }
+
         if (data.session) {
           toast.success("Welcome to Elliot.");
         } else {
-          // Fall back to signing in directly (confirmation is auto-approved).
-          const { error: siErr } = await supabase.auth.signInWithPassword({ email, password });
+          // Confirmation is auto-approved — sign in directly.
+          const { error: siErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
           if (siErr) throw siErr;
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? friendlyAuthError(err.message) : "Something went wrong");
     } finally {
       setLoading(false);
     }
   }
+
 
   async function googleSignIn() {
     setLoading(true);

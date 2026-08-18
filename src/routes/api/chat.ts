@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/chat")({
         }
         const conversationId = String(body.conversationId ?? "");
         const userMessage = String(body.userMessage ?? "").slice(0, 8000);
-        let imageUrls = Array.isArray(body.imageUrls)
+        const imageUrls = Array.isArray(body.imageUrls)
           ? body.imageUrls.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 4)
           : [];
         const tier = String(body.tier ?? "1.2");

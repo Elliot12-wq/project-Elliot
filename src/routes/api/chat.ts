@@ -11,8 +11,10 @@ const jsonError = (status: number, error: string) =>
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request }: { request: Request }) => {
+       try {
         const authHeader = request.headers.get("authorization") ?? "";
+
         const token = authHeader.replace(/^Bearer\s+/i, "");
         if (!token) return jsonError(401, "Not signed in.");
 

@@ -37,9 +37,17 @@ export type AiConfig = {
   supportsVision: boolean;
 };
 
+function env(name: string): string | undefined {
+  const fromProcess =
+    typeof process !== "undefined" ? (process.env as Record<string, string | undefined>)[name] : undefined;
+  const fromVite = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.[name];
+  return fromProcess || fromVite;
+}
+
 export function getAiConfig(tier = "1.2"): AiConfig | null {
-  const groqKey = process.env["GROQ_API_KEY"];
-  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const groqKey = env("GROQ_API_KEY");
+  const lovableKey = env("LOVABLE_API_KEY");
+
   // Lovable hosting: built-in gateway. Anywhere else (Vercel): Groq/Llama.
   if (lovableKey) {
     return {

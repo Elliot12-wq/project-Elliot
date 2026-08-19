@@ -224,7 +224,12 @@ You simply identify as Elliot.${nicknameBlock}${instructionsBlock}${memoryBlock}
             "X-Accel-Buffering": "no",
           },
         });
+       } catch (e) {
+        console.error("chat handler crashed", e);
+        return jsonError(500, `Elliot's server hit an error: ${(e as Error)?.message ?? "unknown"}`);
+       }
       },
+
     },
   },
 });

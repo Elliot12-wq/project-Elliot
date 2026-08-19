@@ -16,13 +16,24 @@ function readGlass() {
   }
 }
 
+function supportsBackdrop() {
+  if (typeof window === "undefined" || typeof CSS === "undefined") return false;
+  return (
+    CSS.supports("backdrop-filter", "blur(1px)") ||
+    CSS.supports("-webkit-backdrop-filter", "blur(1px)")
+  );
+}
+
 export function applyGlass(on: boolean) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.classList.toggle("liquid-glass", on);
-  // Android GPUs choke on heavy backdrop blur — use the lighter variant there.
-  root.classList.toggle("glass-lite", on && isAndroid());
+  // Android gets the same iOS-style material, tuned for Chrome's blur rendering.
+  root.classList.toggle("glass-android", on && isAndroid());
+  // Painted fallback only where backdrop blur isn't supported at all.
+  root.classList.toggle("glass-lite", on && !supportsBackdrop());
 }
+
 
 /** Applies the saved preference on mount. Mount once, high in the tree. */
 export function useGlassBootstrap() {

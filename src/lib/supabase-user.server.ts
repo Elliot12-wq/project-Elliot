@@ -4,11 +4,19 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+function env(name: string): string | undefined {
+  // process.env on Node/Workers; import.meta.env for values inlined at build (Vercel).
+  const fromProcess =
+    typeof process !== "undefined" ? (process.env as Record<string, string | undefined>)[name] : undefined;
+  const fromVite = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.[name];
+  return fromProcess || fromVite;
+}
+
 export function userClient(token: string) {
-  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
-  const key =
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  const url = env("SUPABASE_URL") ?? env("VITE_SUPABASE_URL");
+  const key = env("SUPABASE_PUBLISHABLE_KEY") ?? env("VITE_SUPABASE_PUBLISHABLE_KEY");
   if (!url || !key) return null;
+
 
   return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },

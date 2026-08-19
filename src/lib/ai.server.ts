@@ -39,6 +39,18 @@ export type AiConfig = {
 
 export function getAiConfig(tier = "1.2"): AiConfig | null {
   const groqKey = process.env["GROQ_API_KEY"];
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  // Lovable hosting: built-in gateway. Anywhere else (Vercel): Groq/Llama.
+  if (lovableKey) {
+    return {
+      provider: "lovable",
+      url: LOVABLE_URL,
+      key: lovableKey,
+      chatModel: LOVABLE_TIER_MODEL[tier] ?? LOVABLE_TIER_MODEL["1.2"]!,
+      smallModel: LOVABLE_TIER_MODEL["1.0"]!,
+      supportsVision: true,
+    };
+  }
   if (groqKey) {
     const chatModel = GROQ_TIER_MODEL[tier] ?? GROQ_TIER_MODEL["1.2"]!;
     return {
@@ -50,19 +62,9 @@ export function getAiConfig(tier = "1.2"): AiConfig | null {
       supportsVision: GROQ_VISION.has(chatModel),
     };
   }
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (lovableKey) {
-    return {
-      provider: "lovable",
-      url: LOVABLE_URL,
-      key: lovableKey,
-      chatModel: LOVABLE_TIER_MODEL[tier] ?? LOVABLE_TIER_MODEL["1.2"]!,
-      smallModel: LOVABLE_TIER_MODEL["1.0"]!,
-      supportsVision: true,
-    };
-  }
   return null;
 }
+
 
 export async function aiFetch(cfg: AiConfig, body: Record<string, unknown>) {
   return fetch(cfg.url, {

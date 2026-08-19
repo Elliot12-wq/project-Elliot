@@ -143,7 +143,7 @@ function HomePane({ guest, go }: { guest?: boolean; go: (p: Pane) => void }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm text-foreground">Liquid glass</div>
           <div className="text-[11px] text-muted-foreground">
-            Frosted, translucent surfaces{android ? " — tuned lighter for Android" : ""}.
+            Frosted, translucent iOS-style surfaces{android ? " — tuned for Android" : ""}.
           </div>
         </div>
         <button

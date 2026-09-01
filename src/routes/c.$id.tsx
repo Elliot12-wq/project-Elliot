@@ -6,7 +6,16 @@ import { AmbientBackground } from "@/components/AmbientBackground";
 
 export const Route = createFileRoute("/c/$id")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Elliot" }] }),
+  head: () => ({
+    meta: [
+      { title: "Conversation — Elliot AI" },
+      { name: "description", content: "Continue a private conversation with Elliot AI." },
+      { property: "og:title", content: "Conversation — Elliot AI" },
+      { property: "og:description", content: "Continue your conversation with Elliot." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: ConversationPage,
   errorComponent: ConversationError,
 });

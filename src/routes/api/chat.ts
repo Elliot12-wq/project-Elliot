@@ -48,8 +48,8 @@ export const Route = createFileRoute("/api/chat")({
 
         const ai = getAiConfig(tier);
         if (!ai) {
-          console.error("No AI provider key configured (GROQ_API_KEY / LOVABLE_API_KEY)");
-          return jsonError(500, "AI is not configured on this deployment.");
+          console.error("[elliot-ai] no provider configured", { route: "/api/chat" });
+          return jsonError(503, "Elliot isn't configured on this deployment. Add GROQ_API_KEY and redeploy.");
         }
 
         if (imageUrls.length && !ai.supportsVision) {
@@ -225,8 +225,8 @@ You simply identify as Elliot.${nicknameBlock}${instructionsBlock}${memoryBlock}
           },
         });
        } catch (e) {
-        console.error("chat handler crashed", e);
-        return jsonError(500, `Elliot's server hit an error: ${(e as Error)?.message ?? "unknown"}`);
+        console.error("[elliot-ai] chat handler crashed", e);
+        return jsonError(500, "Elliot's server hit an unexpected error. Check the deployment logs.");
        }
       },
 

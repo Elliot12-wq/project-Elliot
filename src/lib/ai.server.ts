@@ -48,17 +48,7 @@ export function getAiConfig(tier = "1.2"): AiConfig | null {
   const groqKey = env("GROQ_API_KEY");
   const lovableKey = env("LOVABLE_API_KEY");
 
-  // Lovable hosting: built-in gateway. Anywhere else (Vercel): Groq/Llama.
-  if (lovableKey) {
-    return {
-      provider: "lovable",
-      url: LOVABLE_URL,
-      key: lovableKey,
-      chatModel: LOVABLE_TIER_MODEL[tier] ?? LOVABLE_TIER_MODEL["1.2"]!,
-      smallModel: LOVABLE_TIER_MODEL["1.0"]!,
-      supportsVision: true,
-    };
-  }
+  // Groq is Elliot's primary engine. Lovable is a hosting fallback only.
   if (groqKey) {
     const chatModel = GROQ_TIER_MODEL[tier] ?? GROQ_TIER_MODEL["1.2"]!;
     return {
@@ -68,6 +58,16 @@ export function getAiConfig(tier = "1.2"): AiConfig | null {
       chatModel,
       smallModel: GROQ_TIER_MODEL["1.0"]!,
       supportsVision: GROQ_VISION.has(chatModel),
+    };
+  }
+  if (lovableKey) {
+    return {
+      provider: "lovable",
+      url: LOVABLE_URL,
+      key: lovableKey,
+      chatModel: LOVABLE_TIER_MODEL[tier] ?? LOVABLE_TIER_MODEL["1.2"]!,
+      smallModel: LOVABLE_TIER_MODEL["1.0"]!,
+      supportsVision: true,
     };
   }
   return null;

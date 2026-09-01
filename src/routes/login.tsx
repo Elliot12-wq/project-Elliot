@@ -14,7 +14,14 @@ export const Route = createFileRoute("/login")({
     typeof search.email === "string" ? { email: search.email } : {},
 
   head: () => ({
-    meta: [{ title: "Sign in — Elliot" }],
+    meta: [
+      { title: "Sign in — Elliot AI" },
+      { name: "description", content: "Sign in to Elliot AI to access saved conversations, memory, voice, and image understanding." },
+      { property: "og:title", content: "Sign in — Elliot AI" },
+      { property: "og:description", content: "Sign in to continue your conversations with Elliot." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: LoginPage,
 });

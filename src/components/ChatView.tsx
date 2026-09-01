@@ -24,10 +24,10 @@ const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
   { id: "2.3", name: "Elliot 2.3", tagline: "Best reasoning — deep, multi-step" },
 ];
 const ENGINES: Record<TierId, string> = {
-  "1.0": "Gemini 2.5 Flash Lite",
-  "1.2": "Gemini 2.5 Flash",
-  "2.2": "Gemini 2.5 Pro",
-  "2.3": "Gemini 2.5 Pro (deep)",
+  "1.0": "Meta Llama 3.1 8B",
+  "1.2": "Meta Llama 3.3 70B",
+  "2.2": "Meta Llama 4 Scout",
+  "2.3": "Meta Llama 4 Maverick",
 };
 const DEFAULT_TIER: TierId = "1.2";
 const STORAGE_KEY = "elliot.tier";

@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CIdRouteImport } from './routes/c.$id'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiPublicGuestChatRouteImport } from './routes/api/public/guest-chat'
+import { Route as ApiPublicAiHealthRouteImport } from './routes/api/public/ai-health'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -46,6 +47,11 @@ const ApiPublicGuestChatRoute = ApiPublicGuestChatRouteImport.update({
   path: '/api/public/guest-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAiHealthRoute = ApiPublicAiHealthRouteImport.update({
+  id: '/api/public/ai-health',
+  path: '/api/public/ai-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
+  '/api/public/ai-health': typeof ApiPublicAiHealthRoute
   '/api/public/guest-chat': typeof ApiPublicGuestChatRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
+  '/api/public/ai-health': typeof ApiPublicAiHealthRoute
   '/api/public/guest-chat': typeof ApiPublicGuestChatRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
+  '/api/public/ai-health': typeof ApiPublicAiHealthRoute
   '/api/public/guest-chat': typeof ApiPublicGuestChatRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/chat'
     | '/c/$id'
+    | '/api/public/ai-health'
     | '/api/public/guest-chat'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/chat'
     | '/c/$id'
+    | '/api/public/ai-health'
     | '/api/public/guest-chat'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/chat'
     | '/c/$id'
+    | '/api/public/ai-health'
     | '/api/public/guest-chat'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ApiChatRoute: typeof ApiChatRoute
   CIdRoute: typeof CIdRoute
+  ApiPublicAiHealthRoute: typeof ApiPublicAiHealthRoute
   ApiPublicGuestChatRoute: typeof ApiPublicGuestChatRoute
 }
 
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGuestChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ai-health': {
+      id: '/api/public/ai-health'
+      path: '/api/public/ai-health'
+      fullPath: '/api/public/ai-health'
+      preLoaderRoute: typeof ApiPublicAiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ApiChatRoute: ApiChatRoute,
   CIdRoute: CIdRoute,
+  ApiPublicAiHealthRoute: ApiPublicAiHealthRoute,
   ApiPublicGuestChatRoute: ApiPublicGuestChatRoute,
 }
 export const routeTree = rootRouteImport

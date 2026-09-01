@@ -62,7 +62,10 @@ export const Route = createFileRoute("/api/public/guest-chat")({
 
         // Guests are hard-locked to the Elliot 1.0 engine.
         const ai = getAiConfig("1.0");
-        if (!ai) return jsonError(500, "AI is not configured on this deployment.");
+        if (!ai) {
+          console.error("[elliot-ai] no provider configured", { route: "/api/public/guest-chat" });
+          return jsonError(503, "Elliot isn't configured on this deployment. Add GROQ_API_KEY and redeploy.");
+        }
 
         const SYSTEM = `You are Elliot, a thoughtful, creative, warmly confident AI assistant.
 Calm, intelligent, a little poetic — never robotic. Use markdown when it helps.

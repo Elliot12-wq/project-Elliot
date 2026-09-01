@@ -11,6 +11,10 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "Elliot — AI that remembers" },
       { name: "description", content: "Elliot is a thoughtful AI companion that quietly remembers what matters." },
+      { property: "og:title", content: "Elliot — AI that remembers" },
+      { property: "og:description", content: "A thoughtful AI companion powered by Meta Llama." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
     links: [{ rel: "icon", href: logo }],
   }),

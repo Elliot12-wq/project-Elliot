@@ -89,8 +89,10 @@ You simply identify as Elliot.`;
         if (!aiRes.ok || !aiRes.body) {
           const text = await aiRes.text().catch(() => "");
           console.error("guest AI error", ai.provider, aiRes.status, text);
-          if (aiRes.status === 401 || aiRes.status === 403)
-            return jsonError(502, "Elliot's AI key was rejected. Check the deployment's API key.");
+          if (aiRes.status === 401)
+            return jsonError(502, "Elliot's AI key is missing or invalid on this deployment.");
+          if (aiRes.status === 403)
+            return jsonError(403, "Elliot's AI provider blocked this request. Check the provider account or workspace policy.");
           if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again shortly.");
           if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted.");
           return jsonError(502, `Elliot couldn't start a response (upstream ${aiRes.status}).`);

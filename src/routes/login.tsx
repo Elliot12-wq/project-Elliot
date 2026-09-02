@@ -3,7 +3,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import logo from "@/assets/elliot-logo.png";
 import { Toaster } from "@/components/ui/sonner";
 import { rememberAccount } from "@/lib/accounts";
@@ -87,7 +86,7 @@ function LoginPage() {
 
           if (/invalid login credentials/i.test(siErr.message)) {
             setMode("signin");
-            toast.error("This email already has an account. Sign in, or use Continue with Google.");
+            toast.error("This email already has an account. Sign in with your password.");
             return;
           }
           throw siErr;
@@ -114,18 +113,6 @@ function LoginPage() {
     }
   }
 
-
-  async function googleSignIn() {
-    setLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) toast.error("Google sign-in failed");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4">
@@ -192,28 +179,13 @@ function LoginPage() {
             {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
 
-          <div className="relative my-5 flex items-center">
-            <div className="h-px flex-1 bg-border" />
-            <span className="px-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">or</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          <button
-            type="button"
-            onClick={googleSignIn}
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background/50 py-3 text-sm font-medium transition hover:border-primary/60 hover:bg-card/70 disabled:opacity-50"
-          >
-            <GoogleIcon /> Continue with Google
-          </button>
-
           <button
             type="button"
             onClick={() => {
               enterGuest();
               navigate({ to: "/guest" });
             }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-3 text-sm text-foreground/90 transition hover:border-primary/50 hover:bg-primary/10"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-3 text-sm text-foreground/90 transition hover:border-primary/50 hover:bg-primary/10"
           >
             Continue as a guest
           </button>
@@ -256,10 +228,3 @@ function AmbientGlow() {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4">
-      <path fill="#EA4335" d="M12 11v3.2h7.4c-.3 1.7-2.1 5-7.4 5-4.5 0-8.1-3.7-8.1-8.2S7.5 2.8 12 2.8c2.5 0 4.2 1.1 5.2 2l3-2.9C18.2.9 15.4 0 12 0 5.4 0 0 5.4 0 12s5.4 12 12 12c6.9 0 11.5-4.8 11.5-11.7 0-.8-.1-1.4-.2-2H12z" />
-    </svg>
-  );
-}

@@ -169,8 +169,10 @@ You simply identify as Elliot.${nicknameBlock}${instructionsBlock}${memoryBlock}
         if (!aiRes.ok || !aiRes.body) {
           const text = await aiRes.text().catch(() => "");
           console.error("AI provider error", ai.provider, aiRes.status, text);
-          if (aiRes.status === 401 || aiRes.status === 403)
-            return jsonError(502, "Elliot's AI key was rejected. Check the deployment's API key.");
+          if (aiRes.status === 401)
+            return jsonError(502, "Elliot's AI key is missing or invalid on this deployment.");
+          if (aiRes.status === 403)
+            return jsonError(403, "Elliot's AI provider blocked this request. Check the provider account or workspace policy.");
           if (aiRes.status === 429) return jsonError(429, "Elliot is getting too many requests. Try again in a moment.");
           if (aiRes.status === 402) return jsonError(402, "AI credits are exhausted.");
           if (aiRes.status === 400) return jsonError(400, `Model refused this request: ${text.slice(0, 200) || "bad request"}`);

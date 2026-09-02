@@ -10,7 +10,11 @@ export const Route = createFileRoute("/api/public/ai-health")({
         return Response.json(
           ai
             ? { ready: true, provider: ai.provider, model: ai.chatModel }
-            : { ready: false, provider: null, reason: "GROQ_API_KEY is not configured" },
+            : {
+                ready: false,
+                provider: null,
+                reason: "No server-side AI provider is configured. Add GROQ_API_KEY to this deployment and redeploy.",
+              },
           {
             status: ai ? 200 : 503,
             headers: { "Cache-Control": "no-store" },

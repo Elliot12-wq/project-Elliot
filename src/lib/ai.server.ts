@@ -41,7 +41,8 @@ function env(name: string): string | undefined {
   const fromProcess =
     typeof process !== "undefined" ? (process.env as Record<string, string | undefined>)[name] : undefined;
   const fromVite = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.[name];
-  return fromProcess || fromVite;
+  const value = fromProcess || fromVite;
+  return value?.trim() || undefined;
 }
 
 export function getAiConfig(tier = "1.2"): AiConfig | null {
@@ -75,10 +76,14 @@ export function getAiConfig(tier = "1.2"): AiConfig | null {
 
 
 export async function aiFetch(cfg: AiConfig, body: Record<string, unknown>) {
+  const authHeaders = cfg.provider === "lovable"
+    ? { "Lovable-API-Key": cfg.key, "X-Lovable-AIG-SDK": "direct-fetch" }
+    : { Authorization: `Bearer ${cfg.key}` };
+
   return fetch(cfg.url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${cfg.key}`,
+      ...authHeaders,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),

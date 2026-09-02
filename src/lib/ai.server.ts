@@ -16,17 +16,15 @@ const LOVABLE_TIER_MODEL: Record<string, string> = {
 };
 
 const GROQ_TIER_MODEL: Record<string, string> = {
-  "1.0": "llama-3.1-8b-instant",
-  "1.2": "llama-3.3-70b-versatile",
-  "2.2": "meta-llama/llama-4-scout-17b-16e-instruct",
-  "2.3": "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "1.0": "openai/gpt-oss-20b",
+  "1.2": "openai/gpt-oss-120b",
+  "2.2": "groq/compound-mini",
+  "2.3": "groq/compound",
 };
 
-// Groq Llama models that can read images.
-const GROQ_VISION = new Set([
-  "meta-llama/llama-4-scout-17b-16e-instruct",
-  "meta-llama/llama-4-maverick-17b-128e-instruct",
-]);
+// Groq models on this account that can read images.
+const GROQ_VISION = new Set(["groq/compound-mini", "groq/compound"]);
+
 
 export type AiConfig = {
   provider: Provider;

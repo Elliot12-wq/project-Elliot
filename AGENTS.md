@@ -1,0 +1,2 @@
+- Keep Elliot's presentation as a restrained editorial chat workspace: charcoal surfaces, warm white type, and sparing red accents; this keeps the product distinctive without visual noise.
+- Keep chat and auth behavior in their existing modules while making presentation-only changes; this protects conversation and sign-in flows.

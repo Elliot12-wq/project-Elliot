@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GuestRouteImport } from './routes/guest'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +19,16 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiPublicGuestChatRouteImport } from './routes/api/public/guest-chat'
 import { Route as ApiPublicAiHealthRouteImport } from './routes/api/public/ai-health'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -57,6 +69,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
   '/api/public/ai-health': typeof ApiPublicAiHealthRoute
@@ -66,6 +80,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
   '/api/public/ai-health': typeof ApiPublicAiHealthRoute
@@ -76,6 +92,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/guest': typeof GuestRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/api/chat': typeof ApiChatRoute
   '/c/$id': typeof CIdRoute
   '/api/public/ai-health': typeof ApiPublicAiHealthRoute
@@ -87,6 +105,8 @@ export interface FileRouteTypes {
     | '/'
     | '/guest'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/api/chat'
     | '/c/$id'
     | '/api/public/ai-health'
@@ -96,6 +116,8 @@ export interface FileRouteTypes {
     | '/'
     | '/guest'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/api/chat'
     | '/c/$id'
     | '/api/public/ai-health'
@@ -105,6 +127,8 @@ export interface FileRouteTypes {
     | '/'
     | '/guest'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/api/chat'
     | '/c/$id'
     | '/api/public/ai-health'
@@ -115,6 +139,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GuestRoute: typeof GuestRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   ApiChatRoute: typeof ApiChatRoute
   CIdRoute: typeof CIdRoute
   ApiPublicAiHealthRoute: typeof ApiPublicAiHealthRoute
@@ -123,6 +149,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -179,6 +219,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GuestRoute: GuestRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   ApiChatRoute: ApiChatRoute,
   CIdRoute: CIdRoute,
   ApiPublicAiHealthRoute: ApiPublicAiHealthRoute,

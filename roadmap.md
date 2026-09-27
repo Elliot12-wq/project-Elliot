@@ -1,0 +1,2 @@
+- [ ] Refine Elliot's chat, sidebar, and sign-in presentation without changing behavior.
+- [ ] Check desktop and mobile views and the guest chat flow.

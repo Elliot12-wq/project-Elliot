@@ -24,10 +24,10 @@ const TIERS: Array<{ id: TierId; name: string; tagline: string }> = [
   { id: "2.3", name: "Elliot 2.3", tagline: "Best reasoning — deep, multi-step" },
 ];
 const ENGINES: Record<TierId, string> = {
-  "1.0": "Meta Llama 3.1 8B",
-  "1.2": "Meta Llama 3.3 70B",
-  "2.2": "Meta Llama 4 Scout",
-  "2.3": "Meta Llama 4 Maverick",
+  "1.0": "Groq · GPT-OSS 20B",
+  "1.2": "Groq · GPT-OSS 120B",
+  "2.2": "Groq · Compound",
+  "2.3": "Groq · Compound",
 };
 const DEFAULT_TIER: TierId = "1.2";
 const STORAGE_KEY = "elliot.tier";
@@ -54,9 +54,9 @@ function mergeMessages(existing: Msg[], incoming: Msg[]) {
 }
 
 const SUGGESTIONS = [
-  "What can you help me with?",
-  "Write a short poem about embers.",
-  "Brainstorm a startup name with me.",
+  "Help me think through a difficult decision",
+  "Make this idea clearer and stronger",
+  "Explain something I’m curious about",
 ];
 
 export function ChatView({ conversationId, guest }: { conversationId?: string; guest?: boolean }) {
@@ -391,10 +391,10 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
   const empty = messages.length === 0 && !streaming;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col bg-background">
       {/* Top bar */}
-      <header className="relative z-40 border-b border-border/60 bg-background/60 backdrop-blur-xl">
-        <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+      <header className="relative z-40 border-b border-border bg-background/95">
+        <div className="mx-auto flex h-[68px] max-w-6xl items-center gap-3 px-4 sm:px-7">
           {onToggleSidebar && (
             <button
               type="button"
@@ -406,11 +406,11 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
             </button>
           )}
           <div className="relative h-9 w-9 shrink-0 sm:h-10 sm:w-10">
-            <div className="absolute inset-[-5px] rounded-full blur-md" style={{ background: "var(--gradient-glow)", opacity: 0.7 }} />
-            <img src={logo} alt="" className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50" />
+            <div className="hidden" />
+            <img src={logo} alt="" className="relative h-full w-full rounded-full object-cover ring-1 ring-border" />
           </div>
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
-            <h1 className="truncate font-display text-lg tracking-tight sm:text-xl">Elliot</h1>
+            <h1 className="truncate font-sans text-[15px] font-semibold sm:text-base">Elliot</h1>
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={tier}
@@ -418,7 +418,7 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
                 transition={{ duration: 0.22 }}
-                className="hidden truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block"
+                className="hidden truncate text-xs text-muted-foreground sm:block"
               >
                 <span className="text-primary-glow">{activeTier.name}</span> · {activeTier.tagline}
               </motion.span>
@@ -426,17 +426,17 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
           </div>
           <ModelPicker tier={tier} onChange={setTier} guest={guest} />
         </div>
-        <div className="ember-hairline" />
+        
       </header>
 
 
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-5 sm:px-4 sm:py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
         {empty ? (
           <EmptyState onPick={send} tier={activeTier} />
         ) : (
-          <div className="mx-auto flex max-w-2xl flex-col gap-4 lg:max-w-3xl">
+          <div className="mx-auto flex max-w-3xl flex-col gap-7">
 
             <AnimatePresence initial={false}>
               {messages.map((m) => (
@@ -464,7 +464,7 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
 
             {streaming && !streamingText && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                <div className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-md">
+                <div className="border-l-2 border-primary/60 bg-card/40">
                   <ElliotThinking />
                 </div>
               </motion.div>
@@ -487,7 +487,7 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
       {/* Composer */}
       <form
         onSubmit={onSubmit}
-        className="safe-bottom relative border-t border-border/60 bg-background/50 px-3 pt-3 backdrop-blur-xl sm:px-4 sm:pt-4"
+        className="safe-bottom relative border-t border-border bg-background px-4 pt-4 sm:px-8 sm:pt-5"
       >
         <input
           ref={fileInputRef}
@@ -519,13 +519,13 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
           </div>
         )}
 
-        <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-2xl border border-border bg-input/40 p-2 shadow-[var(--shadow-deep)] transition duration-300 focus-within:border-primary/60 focus-within:shadow-[var(--shadow-ember)] focus-within:ring-2 focus-within:ring-primary/30 lg:max-w-3xl">
+        <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-lg border border-border bg-card p-2 transition-colors focus-within:border-primary/60">
           <textarea
             ref={textareaRef}
             value={input + (speech.listening && interimRef.current ? ` ${interimRef.current}` : "")}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={speech.listening ? "Listening…" : "Speak to Elliot…"}
+            placeholder={speech.listening ? "Listening…" : "Ask Elliot anything…"}
             rows={1}
             disabled={streaming}
             className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
@@ -535,7 +535,7 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
             type="button"
             onClick={() => (guest ? guestLocked("Sending photos") : fileInputRef.current?.click())}
             disabled={streaming || (!guest && pendingImages.length >= 4)}
-            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
+            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-background/40 text-muted-foreground transition hover:text-foreground active:scale-95 disabled:opacity-40"
             aria-label={guest ? "Photos need an account" : "Attach image"}
           >
             <ImagePlus className="h-4 w-4" />
@@ -551,7 +551,7 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
             }
 
             disabled={streaming}
-            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
+            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition active:scale-95 ${
               speech.listening
                 ? "border-primary/60 bg-primary/15 text-primary-glow"
                 : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
@@ -572,17 +572,14 @@ export function ChatView({ conversationId, guest }: { conversationId?: string; g
             type={streaming ? "button" : "submit"}
             onClick={streaming ? stopStream : undefined}
             disabled={!streaming && !input.trim() && pendingImages.length === 0}
-            className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-ember)] transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
+            className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
             style={{ background: "var(--gradient-ember)" }}
             aria-label={streaming ? "Stop" : "Send"}
           >
             {streaming ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />}
           </button>
         </div>
-        <p className="mx-auto mt-2 max-w-2xl text-center text-[10px] text-muted-foreground/70">
-          Elliot quietly remembers things that matter · Enter sends · Shift+Enter for newline
-        </p>
-        <p className="mx-auto mt-1 max-w-2xl text-center text-[10px] text-muted-foreground/50">
+        <p className="mx-auto mt-3 max-w-3xl text-center text-[10px] text-muted-foreground/60">
           Made by Charlie Nathaniel P. Sagun
         </p>
       </form>
@@ -602,8 +599,7 @@ function Bubble({ role, content, streaming }: { role: "user" | "assistant"; cont
     }).trim();
     return (
       <div
-        className="max-w-[85%] space-y-2 rounded-2xl rounded-br-md px-3 py-2 text-sm text-primary-foreground shadow-[var(--shadow-ember)]"
-        style={{ background: "var(--gradient-ember)" }}
+        className="max-w-[85%] space-y-2 rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-secondary-foreground"
       >
         {images.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -619,7 +615,7 @@ function Bubble({ role, content, streaming }: { role: "user" | "assistant"; cont
     );
   }
   return (
-    <div className="group relative max-w-[92%] rounded-2xl rounded-bl-md border border-primary/20 bg-card/70 px-4 py-3 text-card-foreground shadow-[0_0_28px_-14px_var(--primary)] backdrop-blur-md transition duration-300 hover:border-primary/40 hover:shadow-[var(--shadow-ember)] sm:max-w-[85%]">
+    <div className="group relative max-w-[92%] border-l-2 border-primary/70 px-5 py-1 text-foreground sm:max-w-[85%]">
       <div className="prose-elliot">
         <ReactMarkdown
           components={{
@@ -658,85 +654,26 @@ function Bubble({ role, content, streaming }: { role: "user" | "assistant"; cont
   );
 }
 
-function useElliotGreeting() {
-  return useMemo(() => {
-    const now = new Date();
-    const h = now.getHours();
-    const dow = now.getDay();
-    const date = now.getDate();
-    const monthName = now.toLocaleString(undefined, { month: "long" });
-
-    let timeGreeting: string;
-    if (h >= 5 && h < 12) timeGreeting = "Good morning";
-    else if (h >= 12 && h < 17) timeGreeting = "Good afternoon";
-    else if (h >= 17 && h < 21) timeGreeting = "Good evening";
-    else timeGreeting = "It's night";
-
-    const dayLinesByDow: Record<number, string[]> = {
-      0: ["Sunday calm — ask away.", "Easy Sunday — what's on your mind?"],
-      1: ["You got any questions on Monday?", "Fresh Monday — where do we start?"],
-      2: ["Nice Tuesday, innit?", "Tuesday's quietly productive — let's go."],
-      3: ["Midweek already — what's on your mind?", "Hump-day Wednesday — anything I can help with?"],
-      4: ["Thursday treating you well?", "Almost Friday — what are we working on?"],
-      5: ["Happy Friday — what are we tackling?", "Friday energy — what's the move?"],
-      6: ["Lazy Saturday questions?", "Saturday's yours — how can I help?"],
-    };
-    const variants = dayLinesByDow[dow];
-    const dayLine = variants[date % variants.length];
-
-    const monthBadge = date <= 3 ? `Happy ${monthName} ✦` : null;
-
-    return { timeGreeting, dayLine, monthBadge };
-  }, []);
-}
-
 function EmptyState({ onPick, tier }: { onPick: (s: string) => void; tier: { id: TierId; name: string; tagline: string } }) {
-  const { timeGreeting, dayLine, monthBadge } = useElliotGreeting();
   return (
-    <div className="mx-auto flex h-full w-full max-w-md flex-col items-center justify-center px-1 pt-6 text-center sm:pt-10">
-      <div className="relative mb-6 h-24 w-24 sm:h-32 sm:w-32 lg:h-40 lg:w-40">
-        <div
-          className="absolute inset-[-24px] rounded-full blur-3xl"
-          style={{ background: "var(--gradient-glow)", animation: "elliot-halo 3s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute inset-[-10px] rounded-full border border-primary/25"
-          style={{ animation: "elliot-ring-spin 18s linear infinite" }}
-        >
-          <div className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-ember shadow-[0_0_8px_var(--primary-glow)]" />
-        </div>
-        <img
-          src={logo}
-          alt="Elliot"
-          className="relative h-full w-full rounded-full object-cover ring-1 ring-primary/50"
-          style={{ animation: "elliot-breathe 3.6s ease-in-out infinite" }}
-        />
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center pb-8 sm:pb-16">
+      <div className="mb-8 flex items-center gap-3">
+        <img src={logo} alt="Elliot" className="h-12 w-12 rounded-full border border-border object-cover" />
+        <span className="text-xs font-medium uppercase text-primary">ELLIOT / {tier.id}</span>
       </div>
-      {monthBadge && (
-        <span className="mb-3 inline-block rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-primary-glow">
-          {monthBadge}
-        </span>
-      )}
-      <h2 className="font-display text-3xl tracking-tight sm:text-4xl">{timeGreeting}.</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{dayLine}</p>
-      <p className="mt-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
-        <span className="text-primary-glow">{tier.name.toUpperCase()}</span>
-        <span className="mx-2 text-muted-foreground/50">·</span>
-        <span>{tier.tagline}</span>
-      </p>
-      <div className="mt-7 flex w-full flex-col gap-2">
-        {SUGGESTIONS.map((s, i) => (
+      <h2 className="max-w-xl font-display text-5xl leading-tight text-foreground sm:text-6xl">What's on your mind?</h2>
+      <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">A place to think, make, and figure things out together.</p>
+      <div className="mt-12 grid gap-2 sm:grid-cols-3">
+        {SUGGESTIONS.map((suggestion) => (
           <button
-            key={s}
-            onClick={() => onPick(s)}
-            className="sheen-card group rounded-xl border border-border bg-card/40 px-4 py-3.5 text-left text-sm text-foreground/90 backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-card/70 hover:shadow-[var(--shadow-ember)] active:scale-[0.99]"
-            style={{ animation: `message-in 0.5s ease-out ${0.08 * i}s both` }}
+            key={suggestion}
+            onClick={() => onPick(suggestion)}
+            className="group flex min-h-28 flex-col justify-between rounded-md border border-border bg-card/50 p-4 text-left text-sm leading-snug text-foreground transition-colors hover:border-primary/60 hover:bg-card"
           >
-            <span className="mr-2 text-primary transition group-hover:translate-x-0.5">›</span>
-            {s}
+            <span>{suggestion}</span>
+            <span aria-hidden className="self-end text-lg text-primary transition-transform group-hover:translate-x-1">↗</span>
           </button>
         ))}
-
       </div>
     </div>
   );
@@ -880,7 +817,7 @@ function ModelPicker({
         ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-background/50 px-3 text-xs font-medium text-foreground/90 transition hover:border-primary/50 hover:bg-card/60 active:scale-95"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-secondary"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
